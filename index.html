@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="WarChaos - Catálogo completo de conquistas, fitas, badges e marks do Warface. Consulte desafios, operações especiais e fitas gold.">
+    <meta name="keywords" content="Warface, conquistas, achievements, badges, marks, stripes, fitas, operações especiais, armas gold">
+    <title>WarChaos | Warface Achievements Catalog</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E⚔️%3C/text%3E%3C/svg%3E">
+    <!-- Open Graph / Discord Embed -->     <meta property="og:type"        content="website">     <meta property="og:url"         content="https://stiflerwfl1-oss.github.io/Conquistas-Warface/">     <meta property="og:title"       content="WarChaos | Catálogo de Conquistas do Warface">     <meta property="og:description" content="Explore o catálogo completo de conquistas, fitas, badges e marks do Warface. Mais de 5.000 itens organizados por operação, modo e classe.">     <meta property="og:image"       content="https://stiflerwfl1-oss.github.io/Conquistas-Warface/og-image.png">     <meta property="og:image:width"  content="1200">     <meta property="og:image:height" content="630">     <meta property="og:locale"      content="pt_BR">     <meta property="og:site_name"   content="WarChaos">     <!-- Twitter Card -->     <meta name="twitter:card"        content="summary_large_image">     <meta name="twitter:title"       content="WarChaos | Catálogo de Conquistas do Warface">     <meta name="twitter:description" content="Explore o catálogo completo de conquistas, fitas, badges e marks do Warface. Mais de 5.000 itens organizados por operação, modo e classe.">     <meta name="twitter:image"       content="https://stiflerwfl1-oss.github.io/Conquistas-Warface/og-image.png"> </head>
+<body>
+    <!-- Header -->
+    <header class="header" id="header">
+        <div class="header__container">
+            <a href="#" class="header__logo" id="logo">
+                <span class="header__logo-icon">⚔</span>
+                <span class="header__logo-text">WAR<span class="accent">CHAOS</span></span>
+            </a>
+            <nav class="header__nav" id="main-nav">
+                <a href="#hero" class="header__nav-link active">Início</a>
+                <a href="#achievements" class="header__nav-link">Conquistas</a>
+                <a href="#ribbons-section" class="header__nav-link">Fitas</a>
+                <a href="#about" class="header__nav-link">Sobre</a>
+            </nav>
+            <div class="header__actions">
+                <button class="theme-toggle" id="theme-toggle" aria-label="Alternar tema">
+                    <span class="theme-toggle__icon theme-toggle__icon--dark">🌙</span>
+                    <span class="theme-toggle__icon theme-toggle__icon--light">☀️</span>
+                </button>
+                <button class="header__mobile-toggle" id="mobile-toggle" aria-label="Menu">
+                    <span></span><span></span><span></span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero" id="hero">
+        <div class="hero__bg-effects">
+            <div class="hero__particle hero__particle--1"></div>
+            <div class="hero__particle hero__particle--2"></div>
+            <div class="hero__particle hero__particle--3"></div>
+            <div class="hero__grid-overlay"></div>
+        </div>
+        <div class="hero__container">
+            <div class="hero__badge">CATÁLOGO DA COMUNIDADE</div>
+            <h1 class="hero__title">
+                Conquistas do <span class="hero__title-accent">Warface</span>
+            </h1>
+            <p class="hero__subtitle">
+                Explore o catálogo completo de desafios, fitas, badges e marks. 
+                Encontre conquistas por operação, modo de jogo, classe e muito mais.
+            </p>
+            <div class="hero__search" id="hero-search">
+                <div class="hero__search-wrapper">
+                    <span class="hero__search-icon">🔍</span>
+                    <input 
+                        type="text" 
+                        class="hero__search-input" 
+                        id="global-search" 
+                        placeholder="Pesquisar desafio por nome ou descrição..."
+                        autocomplete="off"
+                    >
+                    <button class="hero__search-clear" id="search-clear" aria-label="Limpar busca">✕</button>
+                </div>
+                <div class="hero__search-results" id="search-results"></div>
+            </div>
+            <div class="hero__stats">
+                <div class="hero__stat">
+                    <span class="hero__stat-number" id="stat-marks">0</span>
+                    <span class="hero__stat-label">Marks</span>
+                </div>
+                <div class="hero__stat">
+                    <span class="hero__stat-number" id="stat-badges">0</span>
+                    <span class="hero__stat-label">Badges</span>
+                </div>
+                <div class="hero__stat">
+                    <span class="hero__stat-number" id="stat-stripes">0</span>
+                    <span class="hero__stat-label">Fitas</span>
+                </div>
+                <div class="hero__stat">
+                    <span class="hero__stat-number" id="stat-total">0</span>
+                    <span class="hero__stat-label">Total</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Content -->
+    <main class="main" id="achievements">
+        <!-- Category Tabs -->
+        <div class="tabs" id="category-tabs">
+            <div class="tabs__container">
+                <button class="tabs__btn active" data-category="all" id="tab-all">Todos</button>
+                <button class="tabs__btn" data-category="stripes" id="tab-stripes">Fitas</button>
+                <button class="tabs__btn" data-category="badges" id="tab-badges">Badges</button>
+                <button class="tabs__btn" data-category="marks" id="tab-marks">Marks</button>
+                <button class="tabs__btn" data-category="gold" id="tab-gold">Armas Gold</button>
+                <button class="tabs__btn" data-category="specops" id="tab-specops">Operações Especiais</button>
+            </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="filters" id="filters">
+            <div class="filters__container">
+                <div class="filters__group">
+                    <label class="filters__label">Filtro:</label>
+                    <select class="filters__select" id="filter-main">
+                        <option value="todos">Todos os desafios</option>
+                        <option value="armas">ARMAS</option>
+                        <option value="pvp">PVP</option>
+                        <option value="pve">PVE</option>
+                    </select>
+                </div>
+                <div class="filters__group" id="armas-filter-group" style="display:none;">
+                    <label class="filters__label">Eliminações:</label>
+                    <select class="filters__select" id="filter-armas">
+                        <option value="todos">Todos</option>
+                        <option value="low">&lt; 999</option>
+                        <option value="999">999 / 1.000</option>
+                        <option value="2500">2.500</option>
+                        <option value="5000">5.000</option>
+                        <option value="10000">Avançado (10.000)</option>
+                        <option value="especiais">Especiais</option>
+                        <option value="crown">Crown</option>
+                        <option value="dourada">Dourada</option>
+                    </select>
+                </div>
+                <div class="filters__group">
+                    <label class="filters__label">Cores:</label>
+                    <select class="filters__select" id="filter-color">
+                        <option value="todos">Todas as cores</option>
+                        <option value="ouro">Ouro</option>
+                        <option value="prata">Prata</option>
+                        <option value="bronze">Bronze</option>
+                        <option value="preto">Preto</option>
+                        <option value="vermelho">Vermelho</option>
+                        <option value="azul">Azul</option>
+                        <option value="verde">Verde</option>
+                        <option value="outro">Outro</option>
+                    </select>
+                </div>
+                <div class="filters__count">
+                    <span id="results-count">0</span> resultados
+                </div>
+            </div>
+        </div>
+
+        <!-- Achievements Grid -->
+        <section class="grid-section">
+            <div class="grid__container">
+                <div class="grid" id="achievements-grid">
+                    <!-- Cards are injected by JS -->
+                </div>
+                <div class="grid__empty" id="grid-empty" style="display:none;">
+                    <span class="grid__empty-icon">🔍</span>
+                    <h3>Nenhuma conquista encontrada</h3>
+                    <p>Tente ajustar seus filtros ou busca.</p>
+                </div>
+                <div class="grid__loading" id="grid-loading">
+                    <div class="spinner"></div>
+                    <p>Carregando conquistas...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Ribbons Section -->
+        <section class="ribbons-section" id="ribbons-section">
+            <div class="section__container">
+                <div class="section__header">
+                    <h2 class="section__title">Fitas <span class="accent">/ Stripes</span></h2>
+                    <p class="section__subtitle">Fitas de armas, conquistas e progressão</p>
+                </div>
+                <div class="ribbons-filters" id="ribbons-filters">
+                    <button class="ribbons-filter-btn active" data-ribbon="all" id="ribbon-all">Todas as fitas</button>
+                    <button class="ribbons-filter-btn" data-ribbon="normal" id="ribbon-normal">Fitas normais</button>
+                    <button class="ribbons-filter-btn gold-btn" data-ribbon="gold" id="ribbon-gold">
+                        <span class="gold-icon">★</span> Fitas Gold
+                    </button>
+                </div>
+                <div class="grid" id="ribbons-grid">
+                    <!-- Ribbon cards injected by JS -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer" id="about">
+        <div class="footer__container">
+            <div class="footer__top">
+                <div class="footer__brand">
+                    <span class="footer__logo">⚔ WAR<span class="accent">CHAOS</span></span>
+                    <p class="footer__desc">Catálogo completo de conquistas, fitas, badges e marks do Warface. Um projeto da comunidade para a comunidade.</p>
+                </div>
+                <div class="footer__links">
+                    <h4>Navegação</h4>
+                    <a href="#hero">Início</a>
+                    <a href="#achievements">Conquistas</a>
+                    <a href="#ribbons-section">Fitas</a>
+                </div>
+                <div class="footer__links">
+                    <h4>Categorias</h4>
+                    <a href="#" onclick="setCategory('marks')">Marks</a>
+                    <a href="#" onclick="setCategory('badges')">Badges</a>
+                    <a href="#" onclick="setCategory('stripes')">Fitas</a>
+                    <a href="#" onclick="setCategory('gold')">Armas Gold</a>
+                </div>
+                <div class="footer__links">
+                    <h4>Comunidade</h4>
+                    <a href="#">Discord</a>
+                    <a href="#">Contribuir</a>
+                    <a href="#">Reportar Bug</a>
+                </div>
+            </div>
+            <div class="footer__bottom">
+                <p>⚠️ Este é um projeto <strong>não oficial</strong> da comunidade. Warface é marca registrada da MY.GAMES. Este site não é afiliado, endossado ou patrocinado pela MY.GAMES.</p>
+                <p class="footer__copy">© 2024-2026 WarChaos Community Project</p>
+            </div>
+        </div>
+    </footer>
+
+    <button class="scroll-top" id="scroll-top" aria-label="Voltar ao topo">↑</button>
+
+    <script type="module">
+        import { initDiscordActivity } from "./discord.js";
+        await initDiscordActivity();
+    </script>
+    <script src="warbanner-metadata.js?v=1" defer></script>
+    <script src="warbanner-filter-core.js?v=7" defer></script>
+    <script src="data.js?v=8" defer></script>
+    <script src="app.js?v=9" defer></script>
+</body>
+</html>
