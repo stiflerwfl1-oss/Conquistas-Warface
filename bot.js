@@ -1,4 +1,5 @@
 const fs = require('fs');
+const http = require('http');
 const path = require('path');
 const vm = require('vm');
 const https = require('https');
@@ -12,6 +13,7 @@ const WARBANNER_BASE_URL = 'https://warbanner.com.br';
 const DEFAULT_GITHUB_OWNER = 'stiflerwfl1-oss';
 const DEFAULT_GITHUB_REPO = 'Conquistas-Warface';
 const SEARCH_COMMAND_NAME = 'conquista';
+const PORT = Number(process.env.PORT || 3000);
 
 loadEnvFile();
 
@@ -55,6 +57,31 @@ function buildGithubRawUrl() {
 
   if (!owner || !repo) return '';
   return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${dataPath}`;
+}
+
+function startHealthServer() {
+  const server = http.createServer((request, response) => {
+    if (request.url === '/health') {
+      response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      response.end(
+        JSON.stringify({
+          ok: true,
+          source: lastDataSource,
+          loadedItems: achievementsData.length,
+        })
+      );
+      return;
+    }
+
+    response.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+    response.end('Conquistas Warface bot online');
+  });
+
+  server.listen(PORT, () => {
+    console.log(`[web] Healthcheck ouvindo na porta ${PORT}`);
+  });
+
+  return server;
 }
 
 function resolveGithubDataUrl() {
@@ -380,6 +407,7 @@ async function main() {
     throw new Error('Defina DISCORD_TOKEN antes de iniciar o bot.');
   }
 
+  startHealthServer();
   await reloadData();
 
   const searchCommand = new SlashCommandBuilder()

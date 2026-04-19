@@ -1,11 +1,12 @@
 services:
-  - type: worker
+  - type: web
     name: conquistas-warface-bot
     runtime: node
     plan: free
     autoDeploy: true
     buildCommand: npm ci
     startCommand: npm start
+    healthCheckPath: /health
     envVars:
       - key: DISCORD_TOKEN
         sync: false
