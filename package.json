@@ -3,7 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start": "node bot.js"
+    "start": "node bot.js",
+    "test": "node --test warbanner-filter-core.test.js"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "engines": {
     "node": ">=16.9.0"

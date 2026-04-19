@@ -2,13 +2,16 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const https = require('https');
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, Events, GatewayIntentBits, SlashCommandBuilder } = require('discord.js');
 const filterCore = require('./warbanner-filter-core');
 
 const DATA_FILE = path.join(__dirname, 'data.js');
 const METADATA_FILE = path.join(__dirname, 'warbanner-metadata.js');
 const ENV_FILE = path.join(__dirname, '.env');
 const WARBANNER_BASE_URL = 'https://warbanner.com.br';
+const DEFAULT_GITHUB_OWNER = 'stiflerwfl1-oss';
+const DEFAULT_GITHUB_REPO = 'Conquistas-Warface';
+const SEARCH_COMMAND_NAME = 'conquista';
 
 loadEnvFile();
 
@@ -45,8 +48,8 @@ function loadEnvFile() {
 }
 
 function buildGithubRawUrl() {
-  const owner = process.env.GITHUB_OWNER;
-  const repo = process.env.GITHUB_REPO;
+  const owner = process.env.GITHUB_OWNER || DEFAULT_GITHUB_OWNER;
+  const repo = process.env.GITHUB_REPO || DEFAULT_GITHUB_REPO;
   const branch = process.env.GITHUB_BRANCH || 'main';
   const dataPath = process.env.GITHUB_DATA_PATH || 'data.js';
 
@@ -205,6 +208,30 @@ function formatChallengeLine(item) {
   return `${goldPrefix}**${item.name}** (${typeLabel})\n${item.description || 'Sem descricao.'}`;
 }
 
+function buildSearchPayload(query, results, resolved) {
+  const topResults = results.slice(0, 10).map(formatChallengeLine).join('\n\n');
+  const hasMore = results.length > 10 ? `\n\n... e mais ${results.length - 10} resultado(s).` : '';
+  const topItem = resolved.item;
+  const topType = getTypeLabel(topItem.type);
+
+  const payload = {
+    content: `[BUSCA] **Resultados para:** "${query}"\n\n${topResults}${hasMore}`,
+  };
+
+  if (resolved.imageUrl) {
+    payload.embeds = [
+      {
+        title: `${topItem.name} (${topType})`,
+        description: topItem.description || 'Sem descricao.',
+        image: { url: resolved.imageUrl },
+        color: 0xd4a843,
+      },
+    ];
+  }
+
+  return payload;
+}
+
 function extractFilenameFromValue(value) {
   if (!value) return '';
   const normalized = String(value).split('?')[0].trim();
@@ -326,6 +353,14 @@ async function resolveBestImageResult(results) {
   return { item: results[0], imageUrl: null };
 }
 
+async function buildSearchResponse(query) {
+  const results = searchChallenges(query);
+  if (results.length === 0) return null;
+
+  const resolved = await resolveBestImageResult(results);
+  return buildSearchPayload(query, results, resolved);
+}
+
 function searchChallenges(query) {
   const normalized = normalizeSearchQuery(query);
   if (!normalized || normalized.length < 3) return [];
@@ -342,10 +377,20 @@ function searchChallenges(query) {
 
 async function main() {
   if (!process.env.DISCORD_TOKEN) {
-    throw new Error('Defina DISCORD_TOKEN no arquivo .env antes de iniciar o bot.');
+    throw new Error('Defina DISCORD_TOKEN antes de iniciar o bot.');
   }
 
   await reloadData();
+
+  const searchCommand = new SlashCommandBuilder()
+    .setName(SEARCH_COMMAND_NAME)
+    .setDescription('Busca desafios do Warface pelo nome, arma ou termo relacionado.')
+    .addStringOption((option) =>
+      option
+        .setName('termo')
+        .setDescription('Termo para pesquisar nas conquistas')
+        .setRequired(true)
+    );
 
   const client = new Client({
     intents: [
@@ -368,12 +413,56 @@ async function main() {
     console.warn('[discord] Warning:', warning);
   });
 
-  client.once('ready', () => {
+  client.once(Events.ClientReady, async () => {
     console.log(`[discord] Online como ${client.user.tag}`);
     console.log(`[discord] Fonte de dados: ${lastDataSource}`);
+
+    try {
+      await client.application.commands.set([searchCommand.toJSON()]);
+      console.log(`[discord] Slash command /${SEARCH_COMMAND_NAME} sincronizado.`);
+    } catch (error) {
+      console.error(`[discord] Falha ao sincronizar /${SEARCH_COMMAND_NAME}:`, error);
+    }
   });
 
-  client.on('messageCreate', async (message) => {
+  client.on(Events.InteractionCreate, async (interaction) => {
+    if (!interaction.isChatInputCommand()) return;
+    if (interaction.commandName !== SEARCH_COMMAND_NAME) return;
+
+    const query = interaction.options.getString('termo', true).trim();
+    if (!query) {
+      await interaction.reply({
+        content: 'Informe um termo para pesquisar.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    try {
+      await interaction.deferReply();
+      const payload = await buildSearchResponse(query);
+
+      if (!payload) {
+        await interaction.editReply(`Nenhum resultado encontrado para "${query}".`);
+        return;
+      }
+
+      await interaction.editReply(payload);
+    } catch (error) {
+      console.error('[discord] Erro ao processar slash command:', error);
+
+      if (interaction.deferred || interaction.replied) {
+        await interaction.editReply('Ocorreu um erro ao processar sua busca.');
+      } else {
+        await interaction.reply({
+          content: 'Ocorreu um erro ao processar sua busca.',
+          ephemeral: true,
+        });
+      }
+    }
+  });
+
+  client.on(Events.MessageCreate, async (message) => {
     if (message.author.bot) return;
     if (!message.guildId) return;
     if (!isAllowedChannel(message.channelId)) return;
@@ -382,31 +471,8 @@ async function main() {
     if (!content) return;
 
     try {
-      const results = searchChallenges(content);
-      if (results.length === 0) return;
-
-      const topResults = results.slice(0, 10).map(formatChallengeLine).join('\n\n');
-      const hasMore = results.length > 10 ? `\n\n... e mais ${results.length - 10} resultado(s).` : '';
-
-      const resolved = await resolveBestImageResult(results);
-      const topItem = resolved.item;
-      const topType = getTypeLabel(topItem.type);
-
-      const payload = {
-        content: `🔎 **Resultados para:** "${content}"\n\n${topResults}${hasMore}`,
-      };
-
-      if (resolved.imageUrl) {
-        payload.embeds = [
-          {
-            title: `${topItem.name} (${topType})`,
-            description: topItem.description || 'Sem descricao.',
-            image: { url: resolved.imageUrl },
-            color: 0xd4a843,
-          },
-        ];
-      }
-
+      const payload = await buildSearchResponse(content);
+      if (!payload) return;
       await message.channel.send(payload);
     } catch (error) {
       if (error.code === 50013) {
