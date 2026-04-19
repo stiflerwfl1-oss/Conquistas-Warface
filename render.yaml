@@ -1,0 +1,23 @@
+# Render.com configuration
+# Automatic deployment from GitHub
+# https://render.com/docs/web-services
+
+services:
+  - type: web
+    name: warface-bot
+    env: node
+    plan: free # ou starter/professional conforme necessidade
+    branch: main
+    buildCommand: npm ci --only=production
+    startCommand: node bot.js
+    healthCheckPath: /health
+    healthCheckTimeout: 5
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DISCORD_TOKEN
+        fromSecret: discord_token # deve ser configurado no painel Render como secret
+      - key: DISCORD_ALLOWED_CHANNEL_IDS
+        value: ""
+      - key: DATA_REFRESH_MINUTES
+        value: "10"

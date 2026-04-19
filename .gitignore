@@ -1,5 +1,177 @@
+# Dependências
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+pnpm-debug.log*
+.pnpm-store/
+
+# Variáveis de ambiente e segredos
 .env
+.env.local
+.env.*.local
+.env.test
+.env.production
+*.env
+
+# Logs do bot
+logs/
+*.log
 bot.out.log
 bot.err.log
+monitor.log
 npm-debug.log*
+
+# Cache e arquivos temporários
+temp/
+tmp/
+scratch/
+.tmp/
+.cache/
+image-cache/
+*.tmp
+
+# Build outputs
+dist/
+build/
+out/
+target/
+*.tsbuildinfo
+.next/
+.nuxt/
+.nuxt-dist/
+.output/
+
+# IDEs e editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Sistema operacional
+*.lnk
+*.url
+Desktop.ini
+Thumbs.db
+
+# Testes
+test/
+tests/
+coverage/
+.nyc_output/
+jest-results/
+*.test.js
+*.spec.js
+__tests__/
+__mocks__/
+
+# Documentação gerada
+docs/
+doc/
+site/
+*.md.bak
+
+# Arquivos de dados grandes (cache local)
+missing_images_list.txt
+og-image.png
+
+# Configurações específicas de plataforma (não versionar configurações privadas)
+.heroku/
+.railway/
+.render/
+# (arquivos de configuração YAML/JSON como render.yaml E railway.json DEVEM ser commitados)
+
+# Secrets e chaves
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+secrets/
+*.secret
+
+# Backup archives
+backups/
+*.tar.gz
+*.zip
+*.bak
+
+# Sistema de versionamento antigo
+kilo/
+
+# CI/CD local
+.vercel/
+.netlify/
+.firebase/
+
+# Geradores
+generated/
+generated-docs/
+
+# Arquivos do navegador/VS
+*.suo
+*.user
+*.userosscache
+*.sln
+*.csproj
+*.VC.db
+*.VC.VC.opendb
+*.pidb
+*.userprefs
+
+# Python (se houver)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+env/
+.eggs/
+*.egg-info/
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+.gradle/
+build/
+out/
+.classpath
+.project
+.settings/
+
+# Rust
+target/
+Cargo.lock
+# (Cargo.toml deve ser commitado)
+
+# Go
+vendor/
+go.work
+
+# Ruby
+.bundle/
+vendor/bundle/
+
+# PHP
+composer.lock
+vendor/
+
+# .NET
+bin/
+obj/
+*.csproj.user
+*.nuspec
+*.snk

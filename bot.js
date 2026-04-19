@@ -58,6 +58,12 @@ function resolveGithubDataUrl() {
   const configuredUrl = String(process.env.GITHUB_DATA_URL || '').trim();
   if (!configuredUrl) return buildGithubRawUrl();
 
+  // Se for URL raw do GitHub, usar diretamente
+  if (configuredUrl.includes('raw.githubusercontent.com')) {
+    return configuredUrl;
+  }
+
+  // Se for URL do GitHub (repo ou blob), normalizar para raw
   const repoMatch = configuredUrl.match(/^https:\/\/github\.com\/([^\/]+)\/([^\/]+)\/?$/i);
   if (repoMatch) {
     const owner = repoMatch[1];
@@ -78,11 +84,15 @@ function resolveGithubDataUrl() {
     return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${blobPath}`;
   }
 
-  return configuredUrl;
+  console.warn('[config] GITHUB_DATA_URL não é uma URL raw válida nem URL do GitHub, ignorando.');
+  return buildGithubRawUrl();
 }
 
 function loadMetadataMap() {
-  if (!fs.existsSync(METADATA_FILE)) return {};
+  if (!fs.existsSync(METADATA_FILE)) {
+    console.warn('[metadata] Arquivo de metadados não encontrado.');
+    return {};
+  }
 
   try {
     const source = fs.readFileSync(METADATA_FILE, 'utf8');
@@ -90,9 +100,13 @@ function loadMetadataMap() {
     vm.createContext(context);
     vm.runInContext(source, context);
     const map = context.window?.warbannerMetadata || context.warbannerMetadata || {};
-    return map && typeof map === 'object' ? map : {};
+    const result = map && typeof map === 'object' ? map : {};
+    if (Object.keys(result).length === 0) {
+      console.warn('[metadata] Metadados vazios ou malformados.');
+    }
+    return result;
   } catch (error) {
-    console.warn(`[metadata] Falha ao carregar metadados: ${error.message}`);
+    console.error(`[metadata] Falha ao carregar metadados: ${error.message}`);
     return {};
   }
 }
@@ -328,7 +342,7 @@ function searchChallenges(query) {
 
 async function main() {
   if (!process.env.DISCORD_TOKEN) {
-    throw new Error('Defina DISCORD_TOKEN antes de iniciar o bot.');
+    throw new Error('Defina DISCORD_TOKEN no arquivo .env antes de iniciar o bot.');
   }
 
   await reloadData();
@@ -341,7 +355,20 @@ async function main() {
     ],
   });
 
-  client.once('clientReady', () => {
+  // Global error listeners
+  client.on('error', (error) => {
+    console.error('[discord] Client error:', error);
+  });
+
+  client.on('shardError', (error) => {
+    console.error('[discord] Shard error:', error);
+  });
+
+  client.on('warn', (warning) => {
+    console.warn('[discord] Warning:', warning);
+  });
+
+  client.once('ready', () => {
     console.log(`[discord] Online como ${client.user.tag}`);
     console.log(`[discord] Fonte de dados: ${lastDataSource}`);
   });
@@ -382,7 +409,11 @@ async function main() {
 
       await message.channel.send(payload);
     } catch (error) {
-      console.error('[discord] Erro ao processar mensagem:', error);
+      if (error.code === 50013) {
+        console.error('[discord] Sem permissão para enviar mensagem no canal:', message.channelId);
+      } else {
+        console.error('[discord] Erro ao processar mensagem:', error);
+      }
     }
   });
 

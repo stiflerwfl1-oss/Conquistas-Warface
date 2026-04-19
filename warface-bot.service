@@ -1,0 +1,34 @@
+[Unit]
+Description=Warface Discord Bot
+Documentation=https://github.com/stiflerwfl1-oss/Conquistas-Warface
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nodejs
+WorkingDirectory=/opt/warface-bot
+EnvironmentFile=/opt/warface-bot/.env
+ExecStart=/usr/bin/node /opt/warface-bot/bot.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=warface-bot
+
+# Limites de recursos (opcional)
+MemoryLimit=300M
+CPUQuota=50%
+
+# Segurança
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/warface-bot/logs
+
+# Healthcheck
+WatchdogSec=180
+
+[Install]
+WantedBy=multi-user.target

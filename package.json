@@ -1,8 +1,12 @@
 {
   "name": "conquistas-warface-bot",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "start": "node bot.js"
+  },
+  "engines": {
+    "node": ">=16.9.0"
   },
   "dependencies": {
     "discord.js": "^14.21.0"
