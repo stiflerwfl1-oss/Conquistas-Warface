@@ -807,6 +807,20 @@
         return keywords.some((keyword) => getSearchTerms(keyword).includes('gold'));
     }
 
+    function containsWholeTerm(text, term) {
+        const normalizedText = normalizeSearchQuery(text);
+        const normalizedTerm = normalizeSearchQuery(term);
+        if (!normalizedText || !normalizedTerm) return false;
+
+        const pattern = escapeRegExp(normalizedTerm).replace(/\s+/g, '\\s+');
+        return new RegExp(`(?:^|\\s)${pattern}(?=$|\\s)`).test(normalizedText);
+    }
+
+    function hasGoldReference(text) {
+        const goldTerms = getSearchTerms('gold');
+        return goldTerms.some((term) => containsWholeTerm(text, term));
+    }
+
     function is999EliminationsChallenge(item) {
         const requiredCount = getItemRequiredCount(item);
         if (requiredCount !== 999) return false;
@@ -862,7 +876,7 @@
         }
 
         if (activeFilter === 'dourada') {
-            if (!description.includes('dourada')) return false;
+            if (!hasGoldReference(descriptionRaw)) return false;
 
             if (category === 'fitas') {
                 return eliminationCount === 999;
@@ -876,7 +890,7 @@
         }
 
         if (activeFilter === 'especiais') {
-            if (description.includes('dourado') || description.includes('dourada')) {
+            if (hasGoldReference(descriptionRaw)) {
                 return false;
             }
 
