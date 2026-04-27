@@ -37,6 +37,104 @@
         'cyber pro'
     ];
 
+    const SPEC_OPS_ALIASES = {
+        assassination: {
+            canonical: 'Assassination',
+            aliases: [
+                'Assassination',
+                'Tower Raid',
+                'HQ Tower Raid',
+                'The HQ',
+                'White Shark',
+                'Great White Shark',
+                'assassinato',
+                'modo assassinato',
+                'missao assassinato',
+                'missão assassinato',
+                'qg',
+                'the qg',
+                'modo do elevador',
+                'mapa do elevador'
+            ]
+        },
+        cyber_horde: {
+            canonical: 'Cyber Horde',
+            aliases: ['Cyber Horde', 'Darkness', 'horda ciborgue']
+        },
+        cold_peak: {
+            canonical: 'Cold Peak',
+            aliases: ['Cold Peak', 'pico gelado']
+        },
+        marathon: {
+            canonical: 'Marathon',
+            aliases: ['Marathon', 'Cold Peak Marathon', 'maratona cold peak', 'maratona pico gelado']
+        },
+        earth_shaker: {
+            canonical: 'Earth Shaker',
+            aliases: ['Earth Shaker', 'terremoto']
+        },
+        anubis: {
+            canonical: 'Anubis',
+            aliases: ['Anubis', 'anubis', 'anúbis']
+        },
+        blackout: {
+            canonical: 'Blackout',
+            aliases: ['Blackout', 'Escape from Anubis', 'escapar de anubis', 'escapar de anúbis', 'blecaute']
+        },
+        black_shark: {
+            canonical: 'Black Shark',
+            aliases: ['Black Shark', 'tubarao negro', 'tubarão negro']
+        },
+        icebreaker: {
+            canonical: 'Icebreaker',
+            aliases: ['Icebreaker', 'Ice Breaker', 'quebra-gelo', 'quebra gelo']
+        },
+        pripyat: {
+            canonical: 'Pripyat',
+            aliases: ['Pripyat', 'chernobyl']
+        },
+        sunrise: {
+            canonical: 'Sunrise',
+            aliases: ['Sunrise', 'sol nascente', 'nascer do sol']
+        },
+        mars: {
+            canonical: 'Mars',
+            aliases: ['Mars', 'marte']
+        },
+        hydra: {
+            canonical: 'Hydra',
+            aliases: ['Hydra', 'hidra']
+        },
+        operation_blackwood: {
+            canonical: 'Operation Blackwood',
+            aliases: ['Operation Blackwood', 'operacao blackwood', 'operação blackwood', 'blackwood']
+        },
+        swarm: {
+            canonical: 'Swarm',
+            aliases: ['Swarm', 'enxame']
+        },
+        heist: {
+            canonical: 'Heist',
+            aliases: ['Heist']
+        },
+        fjord: {
+            canonical: 'Fjord',
+            aliases: ['Fjord']
+        },
+        night_city: {
+            canonical: 'Night City',
+            aliases: ['Night City']
+        },
+        citadel: {
+            canonical: 'Citadel',
+            aliases: ['Citadel', 'Labyrinth', 'labirinto', 'cidadela']
+        },
+        vila_valhalla: {
+            canonical: 'Vila Valhalla',
+            aliases: ['Vila Valhalla', 'Villa Valhalla']
+        }
+    };
+
     const SYNONYMS = {
         gold: ['dourado', 'dourada', 'douradas', 'golden'],
         silver: ['prateado', 'prateada', 'prateadas'],
@@ -109,6 +207,61 @@
 
     function hasDigit(value) {
         return /\d/.test(String(value || ''));
+    }
+
+    function buildSpecOpsLookup() {
+        const lookup = {};
+
+        Object.values(SPEC_OPS_ALIASES).forEach((entry) => {
+            const canonical = String(entry && entry.canonical || '').trim();
+            if (!canonical) return;
+
+            const canonicalKey = normalizeSearchQuery(canonical);
+            if (!canonicalKey) return;
+
+            lookup[canonicalKey] = canonical;
+
+            (entry.aliases || []).forEach((alias) => {
+                const aliasKey = normalizeSearchQuery(alias);
+                if (!aliasKey) return;
+                lookup[aliasKey] = canonical;
+            });
+        });
+
+        return lookup;
+    }
+
+    function buildSpecOpsCanonicalAliases() {
+        const canonicalAliases = {};
+
+        Object.values(SPEC_OPS_ALIASES).forEach((entry) => {
+            const canonical = String(entry && entry.canonical || '').trim();
+            if (!canonical) return;
+
+            const canonicalKey = normalizeSearchQuery(canonical);
+            if (!canonicalKey) return;
+
+            const aliases = new Set([canonicalKey]);
+
+            (entry.aliases || []).forEach((alias) => {
+                const aliasKey = normalizeSearchQuery(alias);
+                if (!aliasKey) return;
+                aliases.add(aliasKey);
+            });
+
+            canonicalAliases[canonicalKey] = Array.from(aliases);
+        });
+
+        return canonicalAliases;
+    }
+
+    const SPEC_OPS_LOOKUP = buildSpecOpsLookup();
+    const SPEC_OPS_CANONICAL_ALIASES = buildSpecOpsCanonicalAliases();
+
+    function resolveSpecOpsOperationName(searchTerm) {
+        const normalized = normalizeSearchQuery(searchTerm);
+        if (!normalized) return null;
+        return SPEC_OPS_LOOKUP[normalized] || null;
     }
 
     function normalizeText(str) {
@@ -583,6 +736,33 @@
         return calculateSearchRelevance(item, query) > 0;
     }
 
+    function getSpecOpsAliasesForCanonical(canonicalName) {
+        const canonicalKey = normalizeSearchQuery(canonicalName);
+        if (!canonicalKey) return [];
+        return SPEC_OPS_CANONICAL_ALIASES[canonicalKey] || [canonicalKey];
+    }
+
+    function matchesOperationValue(text, aliases) {
+        if (!text || aliases.length === 0) return false;
+
+        return aliases.some((alias) => {
+            const pattern = escapeRegExp(alias).replace(/\s+/g, '\\s+');
+            return new RegExp(`(?:^|\\s)${pattern}(?=$|\\s)`).test(text);
+        });
+    }
+
+    function matchesResolvedOperationFilter(item, resolvedOperationName) {
+        if (!resolvedOperationName) return true;
+
+        const aliases = getSpecOpsAliasesForCanonical(resolvedOperationName);
+        if (aliases.length === 0) return true;
+
+        const operationRaw = normalizeSearchQuery(item && item.operationRaw);
+        const mapRaw = normalizeSearchQuery(item && (item.mapRaw || item.map));
+
+        return matchesOperationValue(operationRaw, aliases) || matchesOperationValue(mapRaw, aliases);
+    }
+
     function matchesArmasFilter(item, armasFilter) {
         const descriptionRaw = String(item && item.description || '');
         const description = normalizeComparableText(descriptionRaw);
@@ -664,6 +844,7 @@
             armasFilter: 'todos',
             colorFilter: 'todos',
             searchTerm: '',
+            resolvedOperationName: null,
             hideEmpty: true,
             showOnlyEmpty: false
         }, options || {});
@@ -702,6 +883,10 @@
             filtered = scoredItems.map((entry) => entry.item);
         }
 
+        if (settings.resolvedOperationName) {
+            filtered = filtered.filter((item) => matchesResolvedOperationFilter(item, settings.resolvedOperationName));
+        }
+
         filtered = filtered.filter((item) => matchesMainFilter(item, settings.mainFilter, settings.armasFilter));
 
         if (settings.colorFilter && settings.colorFilter !== 'todos') {
@@ -728,7 +913,10 @@
         matchesArmasFilter,
         matchesMainFilter,
         normalizeComparableText,
+        normalizeSearchQuery,
         normalizeText,
+        resolveSpecOpsOperationName,
+        getSpecOpsAliasesForCanonical,
         parseEliminationCount
     };
 

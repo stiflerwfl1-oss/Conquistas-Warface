@@ -660,6 +660,26 @@
         return item.tags && item.tags.some(t => t.toLowerCase() === tag.toLowerCase());
     }
 
+    function resolveOperationAlias(searchTerm) {
+        if (!filterCore || typeof filterCore.resolveSpecOpsOperationName !== 'function') {
+            return null;
+        }
+
+        return filterCore.resolveSpecOpsOperationName(searchTerm);
+    }
+
+    function buildFilterOptions(searchTerm) {
+        return {
+            mainFilter: state.mainFilter,
+            armasFilter: state.armasFilter,
+            colorFilter: state.colorFilter,
+            searchTerm,
+            resolvedOperationName: resolveOperationAlias(searchTerm),
+            hideEmpty: state.hideEmpty,
+            showOnlyEmpty: state.showOnlyEmpty,
+        };
+    }
+
     function getFilteredData() {
         let data = [...catalogData];
 
@@ -681,14 +701,7 @@
                 break;
         }
 
-        return filterCore.filterItems(data, {
-            mainFilter: state.mainFilter,
-            armasFilter: state.armasFilter,
-            colorFilter: state.colorFilter,
-            searchTerm: state.searchQuery,
-            hideEmpty: state.hideEmpty,
-            showOnlyEmpty: state.showOnlyEmpty,
-        });
+        return filterCore.filterItems(data, buildFilterOptions(state.searchQuery));
     }
 
     let currentRenderData = [];
@@ -742,14 +755,7 @@
         if (!DOM.ribbonsGrid) return;
         let stripes = catalogData.filter(isRibbon);
 
-        stripes = filterCore.filterItems(stripes, {
-            mainFilter: state.mainFilter,
-            armasFilter: state.armasFilter,
-            colorFilter: state.colorFilter,
-            searchTerm: state.searchQuery,
-            hideEmpty: state.hideEmpty,
-            showOnlyEmpty: state.showOnlyEmpty,
-        });
+        stripes = filterCore.filterItems(stripes, buildFilterOptions(state.searchQuery));
 
         if (state.ribbonFilter === 'gold') {
             stripes = stripes.filter(isGoldRibbon);
@@ -804,14 +810,7 @@
                 break;
         }
 
-        results = filterCore.filterItems(results, {
-            mainFilter: state.mainFilter,
-            armasFilter: state.armasFilter,
-            colorFilter: state.colorFilter,
-            searchTerm: query,
-            hideEmpty: state.hideEmpty,
-            showOnlyEmpty: state.showOnlyEmpty,
-        }).slice(0, 8);
+        results = filterCore.filterItems(results, buildFilterOptions(query)).slice(0, 8);
 
         if (results.length === 0) {
             DOM.searchResults.innerHTML = `
