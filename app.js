@@ -262,44 +262,105 @@
         return classMap[canonicalType] || canonicalType;
     }
 
-    const OPERATION_ALIASES = {
-        'black shark': ['black shark', 'tubarão negro'],
-        'icebreaker': ['icebreaker', 'quebra-gelo', 'pico gelado'],
-        'mars': ['mars', 'marte'],
-        'anubis': ['anubis', 'anúbis'],
-        'hydra': ['hydra'],
-        'pripyat': ['pripyat'],
-        'sunrise': ['sunrise', 'sol nascente', 'nascer do sol'],
-        'swarm': ['swarm', 'enxame'],
-        'operation blackwood': ['operation blackwood', 'blackwood', 'operação blackwood'],
-        'heist': ['heist', 'roubo', 'fuga'],
-        'cyber horde': ['cyber horde', 'horda ciborgue', 'horda cibernética'],
-        'earth shaker': ['earth shaker', 'terremoto', 'operação qg'],
-        'blackout': ['blackout', 'blecaute'],
-        'tower hq': ['tower hq', 'quartel-general', 'quartel-general / qg', 'qg'],
-        'silent streets': ['silent streets', 'ruas silenciosas'],
-    };
-
-    function getOperationSearchText(item) {
-        return `${item?.name || ''} ${item?.description || ''} ${item?.operationRaw || ''}`.toLowerCase();
+    function normalizeOperationText(value) {
+        return String(value || '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
     }
 
-    const SPEC_OPS_TERMS = Array.from(new Set(Object.values(OPERATION_ALIASES).flat().concat(['tower raid', 'citadel'])));
+    function escapeRegExp(value) {
+        return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function hasWholePhrase(text, term) {
+        const normalizedTerm = normalizeOperationText(term);
+        if (!normalizedTerm) return false;
+
+        const phrase = escapeRegExp(normalizedTerm).replace(/\s+/g, '\\s+');
+        return new RegExp(`(?:^|\\s)${phrase}(?=$|\\s)`).test(text);
+    }
+
+    const OPERATION_ALIAS_GROUPS = [
+        ['black shark', 'tubarao negro'],
+        ['icebreaker', 'quebra gelo', 'pico gelado'],
+        ['mars', 'marte'],
+        ['anubis', 'anubis'],
+        ['hydra'],
+        ['pripyat'],
+        ['sunrise', 'sol nascente', 'nascer do sol'],
+        ['swarm', 'enxame'],
+        ['blackwood', 'operation blackwood', 'operacao blackwood'],
+        ['heist', 'roubo', 'fuga'],
+        ['cyber horde', 'horda ciborgue', 'horda cibernetica'],
+        ['earth shaker', 'terremoto', 'operacao qg'],
+        ['blackout', 'blecaute'],
+        ['tower hq', 'quartel general', 'qg'],
+        ['silent streets', 'ruas silenciosas'],
+        ['volcano', 'vulcao', 'assalto']
+    ].map((group) => Array.from(new Set(group.map((term) => normalizeOperationText(term)).filter(Boolean))));
+
+    const OPERATION_ALIAS_INDEX = (() => {
+        const index = new Map();
+        OPERATION_ALIAS_GROUPS.forEach((group) => {
+            group.forEach((term) => index.set(term, group));
+        });
+        return index;
+    })();
+
+    const SPEC_OPS_TERMS = Array.from(new Set(
+        OPERATION_ALIAS_GROUPS.flat().concat([
+            'special operations',
+            'special operation',
+            'operacoes especiais',
+            'operacao especial',
+            'spec ops',
+            'specops',
+            'co op',
+            'coop',
+            'cooperative',
+            'cooperativo',
+            'pve',
+            'tower raid',
+            'citadel'
+        ].map((term) => normalizeOperationText(term)))
+    )).filter(Boolean);
+
+    function getOperationSearchText(item) {
+        return normalizeOperationText([
+            item?.name || '',
+            item?.description || '',
+            item?.operationRaw || '',
+            item?.mapRaw || '',
+            item?.mode || '',
+            (item?.tags || []).join(' ')
+        ].join(' '));
+    }
 
     function getOperationTerms(opName) {
-        const normalized = String(opName || '').trim().toLowerCase();
-        return OPERATION_ALIASES[normalized] || [normalized];
+        const normalized = normalizeOperationText(opName);
+        if (!normalized) return [];
+        return OPERATION_ALIAS_INDEX.get(normalized) || [normalized];
     }
 
     function matchesOperationAlias(item, opName) {
         const text = getOperationSearchText(item);
         const terms = getOperationTerms(opName);
-        return terms.some(term => text.includes(term));
+        return terms.some((term) => hasWholePhrase(text, term));
     }
 
     function matchesAnyTerm(item, terms) {
         const text = getOperationSearchText(item);
-        return terms.some(term => text.includes(term));
+        return terms.some((term) => hasWholePhrase(text, term));
+    }
+
+    function isSpecialOperationItem(item) {
+        const operationRaw = normalizeOperationText(item?.operationRaw);
+        if (operationRaw) return true;
+        return matchesAnyTerm(item, SPEC_OPS_TERMS);
     }
 
     function getSearchText(item) {
@@ -616,7 +677,7 @@
                 data = data.filter(isGoldCategoryItem);
                 break;
             case 'specops':
-                data = data.filter(a => matchesAnyTerm(a, SPEC_OPS_TERMS));
+                data = data.filter(isSpecialOperationItem);
                 break;
         }
 
@@ -739,7 +800,7 @@
                 results = results.filter(isGoldCategoryItem);
                 break;
             case 'specops':
-                results = results.filter(a => matchesAnyTerm(a, SPEC_OPS_TERMS));
+                results = results.filter(isSpecialOperationItem);
                 break;
         }
 

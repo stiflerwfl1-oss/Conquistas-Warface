@@ -48,13 +48,49 @@
         sniper: ['franco', 'barret'],
         smg: ['submetralhadora'],
         map: ['mapa'],
-        operation: ['operacao'],
+        operation: ['operacao', 'operations', 'mission', 'missao'],
+        pve: [
+            'co op', 'coop', 'cooperative', 'cooperativo', 'cooperacao',
+            'player versus environment', 'spec ops', 'specops',
+            'special operations', 'special operation',
+            'operacoes especiais', 'operacao especial'
+        ],
+        'special operations': ['operacoes especiais', 'operacao especial', 'spec ops', 'specops', 'co op', 'coop'],
         camo: ['camouflage', 'padrao'],
         skin: ['cosmetic', 'visual'],
         ribbon: ['fita', 'laco'],
         achievement: ['conquista'],
-        'black shark': ['tubarao negro']
+        'black shark': ['tubarao negro'],
+        'tubarao negro': ['black shark'],
+        icebreaker: ['quebra gelo', 'pico gelado'],
+        'quebra gelo': ['icebreaker', 'pico gelado'],
+        'pico gelado': ['icebreaker', 'quebra gelo'],
+        blackwood: ['operation blackwood', 'operacao blackwood'],
+        heist: ['fuga'],
+        fuga: ['heist'],
+        blackout: ['blecaute'],
+        blecaute: ['blackout'],
+        volcano: ['vulcao', 'assalto'],
+        vulcao: ['volcano', 'assalto'],
+        assalto: ['volcano', 'vulcao'],
+        sunrise: ['sol nascente', 'nascer do sol'],
+        mars: ['marte'],
+        'tower hq': ['quartel general', 'qg'],
+        'quartel general': ['tower hq', 'qg']
     };
+
+    const SPECIAL_OPS_HINT_TERMS = [
+        'spec ops',
+        'specops',
+        'special operations',
+        'special operation',
+        'operacoes especiais',
+        'operacao especial',
+        'co op',
+        'coop',
+        'cooperative',
+        'cooperativo'
+    ];
 
     function normalizeComparableText(value) {
         return String(value || '')
@@ -165,9 +201,29 @@
             .map((tag) => normalizeComparableText(tag))
             .filter(Boolean);
         const description = normalizeComparableText(item && item.description);
+        const operation = normalizeComparableText(item && item.operationRaw);
+        const mode = normalizeComparableText(item && item.mode);
+        const map = normalizeComparableText(item && (item.mapRaw || item.map));
+        const hasPveTag = tags.includes('pve');
+        const hasOperationSemantic = /operacao|operation|spec ops|specops|special operations|special operation|co op|coop/.test(
+            `${name} ${description} ${operation} ${map}`
+        );
+        const isSpecialOperation = Boolean(operation) || (hasPveTag && hasOperationSemantic);
+        const specialOpsHints = isSpecialOperation ? SPECIAL_OPS_HINT_TERMS.join(' ') : '';
+        const context = [operation, mode, map, specialOpsHints].filter(Boolean).join(' ');
         const nameTokens = name.split(/\s+/).filter(Boolean);
 
-        return { name, tags, description, nameTokens };
+        return {
+            name,
+            tags,
+            description,
+            operation,
+            mode,
+            map,
+            context,
+            isSpecialOperation,
+            nameTokens
+        };
     }
 
     function getBestKeywordScore(searchFields, keyword) {
@@ -192,6 +248,10 @@
             bestScore = Math.max(bestScore, 70);
         }
 
+        if (terms.some((term) => searchFields.context.includes(term))) {
+            bestScore = Math.max(bestScore, 115);
+        }
+
         const hasFuzzyNameMatch = terms.some((term) => {
             if (hasDigit(term)) return false;
             return searchFields.nameTokens.some((token) => {
@@ -212,14 +272,14 @@
         if (!query) return 0;
 
         const searchFields = getSearchFields(item);
-        if (!searchFields.name && searchFields.tags.length === 0 && !searchFields.description) {
+        if (!searchFields.name && searchFields.tags.length === 0 && !searchFields.description && !searchFields.context) {
             return 0;
         }
 
         const expandedQueryTerms = getSearchTerms(query);
         const queryKeywords = query.split(/\s+/).filter((keyword) => keyword.length > 0);
         const phraseTerms = expandedQueryTerms.filter((term) => term.includes(' '));
-        const hasAlternativePhrase = phraseTerms.some((term) => term !== query);
+        const hasAlternativePhrase = query.includes(' ') && phraseTerms.some((term) => term !== query);
 
         let score = 0;
         let skipKeywordStrictMatch = false;
@@ -244,19 +304,26 @@
             score += 110;
         }
 
+        if (expandedQueryTerms.some((term) => searchFields.context.includes(term))) {
+            score += 240;
+        }
+
+        if (searchFields.isSpecialOperation && expandedQueryTerms.some((term) => SPECIAL_OPS_HINT_TERMS.includes(term))) {
+            score += 200;
+        }
+
         if (hasAlternativePhrase) {
             const hasPhraseMatch = phraseTerms.some((term) => {
                 return searchFields.name.includes(term)
                     || searchFields.tags.some((tag) => tag.includes(term))
-                    || searchFields.description.includes(term);
+                    || searchFields.description.includes(term)
+                    || searchFields.context.includes(term);
             });
 
-            if (!hasPhraseMatch) {
-                return 0;
+            if (hasPhraseMatch) {
+                score += 280;
+                skipKeywordStrictMatch = true;
             }
-
-            score += 280;
-            skipKeywordStrictMatch = true;
         }
 
         if (queryKeywords.length > 0 && !skipKeywordStrictMatch) {
@@ -425,6 +492,7 @@
     function matchesMainFilter(item, mainFilter, armasFilter) {
         const activeMainFilter = String(mainFilter || 'todos');
         const description = normalizeComparableText(item && item.description);
+        const descriptionSearch = normalizeSearchQuery(item && item.description);
         const filename = normalizeComparableText(item && item.filename);
 
         if (activeMainFilter === 'armas') {
@@ -436,7 +504,9 @@
         }
 
         if (activeMainFilter === 'pve') {
-            return filename.includes('pve') || /completar|missao|operacao/i.test(description);
+            return filename.includes('pve')
+                || /completar|missao|operacao|mission|operation|spec\s*ops|special\s*operation|co\s*op|coop/i.test(descriptionSearch)
+                || Boolean(normalizeComparableText(item && item.operationRaw));
         }
 
         return true;
