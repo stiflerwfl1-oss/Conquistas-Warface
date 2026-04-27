@@ -134,6 +134,78 @@
         'personalizada'
     ]);
 
+    function addAlnumBoundarySpaces(value) {
+        const normalized = normalizeText(value);
+        if (!normalized) return '';
+
+        let result = '';
+        for (let index = 0; index < normalized.length; index += 1) {
+            const current = normalized[index];
+            const next = normalized[index + 1];
+            result += current;
+
+            if (!next || current === ' ' || next === ' ') continue;
+
+            const currentIsLetter = /[a-z]/.test(current);
+            const currentIsDigit = /\d/.test(current);
+            const nextIsLetter = /[a-z]/.test(next);
+            const nextIsDigit = /\d/.test(next);
+
+            if ((currentIsLetter && nextIsDigit) || (currentIsDigit && nextIsLetter)) {
+                result += ' ';
+            }
+        }
+
+        return result.replace(/\s+/g, ' ').trim();
+    }
+
+    function collapseSeparatedAlnumTokens(value) {
+        const tokens = normalizeText(value).split(' ').filter(Boolean);
+        if (tokens.length === 0) return '';
+
+        const merged = [];
+
+        for (const token of tokens) {
+            if (merged.length === 0) {
+                merged.push(token);
+                continue;
+            }
+
+            const previous = merged[merged.length - 1];
+            const tokenIsDigits = /^\d+$/.test(token);
+            const tokenIsLetters = /^[a-z]+$/.test(token);
+            const previousEndsWithLetter = /[a-z]$/.test(previous);
+            const previousEndsWithDigit = /\d$/.test(previous);
+
+            const shouldMerge =
+                (previousEndsWithLetter && tokenIsDigits)
+                || (previousEndsWithDigit && tokenIsLetters && token.length <= 2);
+
+            if (shouldMerge) {
+                merged[merged.length - 1] = `${previous}${token}`;
+            } else {
+                merged.push(token);
+            }
+        }
+
+        return merged.join(' ');
+    }
+
+    function getWeaponQueryVariants(query) {
+        const normalized = normalizeText(query);
+        if (!normalized) return [];
+
+        const variants = [
+            normalized,
+            addAlnumBoundarySpaces(normalized),
+            collapseSeparatedAlnumTokens(normalized),
+            collapseSeparatedAlnumTokens(addAlnumBoundarySpaces(normalized)),
+            addAlnumBoundarySpaces(collapseSeparatedAlnumTokens(normalized))
+        ];
+
+        return [...new Set(variants.map((value) => normalizeText(value)).filter(Boolean))];
+    }
+
     function matchesWeaponQuery(description, query) {
         const d = normalizeText(description);
         const q = normalizeText(query);
@@ -142,18 +214,22 @@
         const queryTokens = q.split(' ').filter(Boolean);
         const queryWantsCustom = queryTokens.some((token) => CUSTOM_MARKERS.has(token));
 
-        const phrase = escapeRegExp(q).replace(/\s+/g, '\\s+');
-        const regex = new RegExp(`(?:^|\\s)(${phrase})(?=$|\\s)`, 'g');
+        const queryVariants = getWeaponQueryVariants(q);
 
-        let match;
-        while ((match = regex.exec(d)) !== null) {
-            if (queryWantsCustom) return true;
+        for (const variant of queryVariants) {
+            const phrase = escapeRegExp(variant).replace(/\s+/g, '\\s+');
+            const regex = new RegExp(`(?:^|\\s)(${phrase})(?=$|\\s)`, 'g');
 
-            const after = d.slice(match.index + match[0].length).trimStart();
-            const nextToken = after.split(' ', 1)[0];
-            if (CUSTOM_MARKERS.has(nextToken)) continue;
+            let match;
+            while ((match = regex.exec(d)) !== null) {
+                if (queryWantsCustom) return true;
 
-            return true;
+                const after = d.slice(match.index + match[0].length).trimStart();
+                const nextToken = after.split(' ', 1)[0];
+                if (CUSTOM_MARKERS.has(nextToken)) continue;
+
+                return true;
+            }
         }
 
         return false;
@@ -351,6 +427,7 @@
             }
 
             score += 520;
+            skipKeywordStrictMatch = true;
         }
 
         if (searchFields.name === query) {
