@@ -153,17 +153,28 @@
         const badges = catalogData.filter(a => getCanonicalType(a.type) === 'insignia').length;
         const stripes = catalogData.filter(a => getCanonicalType(a.type) === 'fita').length;
         const total = catalogData.length;
+        const marksEl = $('#stat-marks');
+        const badgesEl = $('#stat-badges');
+        const stripesEl = $('#stat-stripes');
+        const totalEl = $('#stat-total');
 
-        $('#stat-marks').dataset.target = marks;
-        $('#stat-badges').dataset.target = badges;
-        $('#stat-stripes').dataset.target = stripes;
-        $('#stat-total').dataset.target = total;
-
-        // Set initial text
-        $('#stat-marks').textContent = marks;
-        $('#stat-badges').textContent = badges;
-        $('#stat-stripes').textContent = stripes;
-        $('#stat-total').textContent = total;
+        // Stats are optional in the layout; update only if present.
+        if (marksEl) {
+            marksEl.dataset.target = marks;
+            marksEl.textContent = marks;
+        }
+        if (badgesEl) {
+            badgesEl.dataset.target = badges;
+            badgesEl.textContent = badges;
+        }
+        if (stripesEl) {
+            stripesEl.dataset.target = stripes;
+            stripesEl.textContent = stripes;
+        }
+        if (totalEl) {
+            totalEl.dataset.target = total;
+            totalEl.textContent = total;
+        }
     }
 
     function animateStats() {

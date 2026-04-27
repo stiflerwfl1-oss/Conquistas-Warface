@@ -3,22 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="WarChaos - Catálogo completo de conquistas, fitas, badges e marks do Warface. Consulte desafios, operações especiais e fitas gold.">
-    <meta name="keywords" content="Warface, conquistas, achievements, badges, marks, stripes, fitas, operações especiais, armas gold">
-    <title>WarChaos | Warface Achievements Catalog</title>
+    <meta name="description" content="ObscureArt - Catálogo completo de conquistas, fitas, insignias e marcas do Warface. Consulte desafios e operações especiais.">
+    <meta name="keywords" content="Warface, conquistas, achievements, insignias, marcas, stripes, fitas, operações especiais">
+    <title>ObscureArt | Warface Achievements Catalog</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E⚔️%3C/text%3E%3C/svg%3E">
-    <!-- Open Graph / Discord Embed -->     <meta property="og:type"        content="website">     <meta property="og:url"         content="https://stiflerwfl1-oss.github.io/Conquistas-Warface/">     <meta property="og:title"       content="WarChaos | Catálogo de Conquistas do Warface">     <meta property="og:description" content="Explore o catálogo completo de conquistas, fitas, badges e marks do Warface. Mais de 5.000 itens organizados por operação, modo e classe.">     <meta property="og:image"       content="https://stiflerwfl1-oss.github.io/Conquistas-Warface/og-image.png">     <meta property="og:image:width"  content="1200">     <meta property="og:image:height" content="630">     <meta property="og:locale"      content="pt_BR">     <meta property="og:site_name"   content="WarChaos">     <!-- Twitter Card -->     <meta name="twitter:card"        content="summary_large_image">     <meta name="twitter:title"       content="WarChaos | Catálogo de Conquistas do Warface">     <meta name="twitter:description" content="Explore o catálogo completo de conquistas, fitas, badges e marks do Warface. Mais de 5.000 itens organizados por operação, modo e classe.">     <meta name="twitter:image"       content="https://stiflerwfl1-oss.github.io/Conquistas-Warface/og-image.png"> </head>
+    <!-- Open Graph / Discord Embed -->     <meta property="og:type"        content="website">     <meta property="og:url"         content="https://stiflerwfl1-oss.github.io/Conquistas-Warface/">     <meta property="og:title"       content="ObscureArt | Catálogo de Conquistas do Warface">     <meta property="og:description" content="Explore o catálogo completo de conquistas, fitas, insignias e marcas do Warface.">     <meta property="og:image"       content="https://stiflerwfl1-oss.github.io/Conquistas-Warface/og-image.png">     <meta property="og:image:width"  content="1200">     <meta property="og:image:height" content="630">     <meta property="og:locale"      content="pt_BR">     <meta property="og:site_name"   content="ObscureArt">     <!-- Twitter Card -->     <meta name="twitter:card"        content="summary_large_image">     <meta name="twitter:title"       content="ObscureArt | Catálogo de Conquistas do Warface">     <meta name="twitter:description" content="Explore o catálogo completo de conquistas, fitas, insignias e marcas do Warface.">     <meta name="twitter:image"       content="https://stiflerwfl1-oss.github.io/Conquistas-Warface/og-image.png"> </head>
 <body>
     <!-- Header -->
     <header class="header" id="header">
         <div class="header__container">
             <a href="#" class="header__logo" id="logo">
                 <span class="header__logo-icon">⚔</span>
-                <span class="header__logo-text">WAR<span class="accent">CHAOS</span></span>
+                <span class="header__logo-text">Obscure<span class="accent">Art</span></span>
             </a>
             <nav class="header__nav" id="main-nav">
                 <a href="#hero" class="header__nav-link active">Início</a>
@@ -52,9 +52,19 @@
                 Conquistas do <span class="hero__title-accent">Warface</span>
             </h1>
             <p class="hero__subtitle">
-                Explore o catálogo completo de desafios, fitas, badges e marks. 
+                Explore o catálogo completo de desafios, fitas, insignias e marcas.
                 Encontre conquistas por operação, modo de jogo, classe e muito mais.
             </p>
+            <div class="hero__clan-mark" aria-label="Logo do clã ObscureArt">
+                <img
+                    class="hero__clan-logo"
+                    src="clan-logo.webp"
+                    alt="Logo do clã ObscureArt"
+                    width="180"
+                    height="180"
+                    loading="lazy"
+                >
+            </div>
             <div class="hero__search" id="hero-search">
                 <div class="hero__search-wrapper">
                     <span class="hero__search-icon">🔍</span>
@@ -72,19 +82,15 @@
             <div class="hero__stats">
                 <div class="hero__stat">
                     <span class="hero__stat-number" id="stat-marks">0</span>
-                    <span class="hero__stat-label">Marks</span>
+                    <span class="hero__stat-label">Marcas</span>
                 </div>
                 <div class="hero__stat">
                     <span class="hero__stat-number" id="stat-badges">0</span>
-                    <span class="hero__stat-label">Badges</span>
+                    <span class="hero__stat-label">Insignias</span>
                 </div>
                 <div class="hero__stat">
                     <span class="hero__stat-number" id="stat-stripes">0</span>
                     <span class="hero__stat-label">Fitas</span>
-                </div>
-                <div class="hero__stat">
-                    <span class="hero__stat-number" id="stat-total">0</span>
-                    <span class="hero__stat-label">Total</span>
                 </div>
             </div>
         </div>
@@ -97,8 +103,8 @@
             <div class="tabs__container">
                 <button class="tabs__btn active" data-category="all" id="tab-all">Todos</button>
                 <button class="tabs__btn" data-category="stripes" id="tab-stripes">Fitas</button>
-                <button class="tabs__btn" data-category="badges" id="tab-badges">Badges</button>
-                <button class="tabs__btn" data-category="marks" id="tab-marks">Marks</button>
+                <button class="tabs__btn" data-category="badges" id="tab-badges">Insignias</button>
+                <button class="tabs__btn" data-category="marks" id="tab-marks">Marcas</button>
                 <button class="tabs__btn" data-category="gold" id="tab-gold">Armas Gold</button>
                 <button class="tabs__btn" data-category="specops" id="tab-specops">Operações Especiais</button>
             </div>
@@ -143,9 +149,6 @@
                         <option value="verde">Verde</option>
                         <option value="outro">Outro</option>
                     </select>
-                </div>
-                <div class="filters__count">
-                    <span id="results-count">0</span> resultados
                 </div>
             </div>
         </div>
@@ -194,8 +197,8 @@
         <div class="footer__container">
             <div class="footer__top">
                 <div class="footer__brand">
-                    <span class="footer__logo">⚔ WAR<span class="accent">CHAOS</span></span>
-                    <p class="footer__desc">Catálogo completo de conquistas, fitas, badges e marks do Warface. Um projeto da comunidade para a comunidade.</p>
+                    <span class="footer__logo">⚔ Obscure<span class="accent">Art</span></span>
+                    <p class="footer__desc">Catálogo completo de conquistas, fitas, insignias e marcas do Warface. Um projeto da comunidade para a comunidade.</p>
                 </div>
                 <div class="footer__links">
                     <h4>Navegação</h4>
@@ -205,8 +208,8 @@
                 </div>
                 <div class="footer__links">
                     <h4>Categorias</h4>
-                    <a href="#" onclick="setCategory('marks')">Marks</a>
-                    <a href="#" onclick="setCategory('badges')">Badges</a>
+                    <a href="#" onclick="setCategory('marks')">Marcas</a>
+                    <a href="#" onclick="setCategory('badges')">Insignias</a>
                     <a href="#" onclick="setCategory('stripes')">Fitas</a>
                     <a href="#" onclick="setCategory('gold')">Armas Gold</a>
                 </div>
@@ -219,7 +222,7 @@
             </div>
             <div class="footer__bottom">
                 <p>⚠️ Este é um projeto <strong>não oficial</strong> da comunidade. Warface é marca registrada da MY.GAMES. Este site não é afiliado, endossado ou patrocinado pela MY.GAMES.</p>
-                <p class="footer__copy">© 2024-2026 WarChaos Community Project</p>
+                <p class="footer__copy">© 2024-2026 ObscureArt Community Project</p>
             </div>
         </div>
     </footer>
