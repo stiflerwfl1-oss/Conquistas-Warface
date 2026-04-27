@@ -388,14 +388,36 @@
         return false;
     }
 
-    function queryRequiresWeaponPrecision(query) {
+    function getWeaponPrecisionQuery(query) {
         const normalized = normalizeText(query);
-        if (!normalized) return false;
-
-        if (hasDigit(normalized)) return true;
+        if (!normalized) return null;
 
         const tokens = normalized.split(' ').filter(Boolean);
-        return tokens.some((token) => CUSTOM_MARKERS.has(token));
+        if (tokens.length === 0) return null;
+
+        const customToken = tokens.find((token) => CUSTOM_MARKERS.has(token)) || null;
+
+        const digitTokenIndex = tokens.findIndex((token) => /\d/.test(token));
+        if (digitTokenIndex >= 0) {
+            let start = digitTokenIndex;
+
+            if (digitTokenIndex > 0 && /^[a-z]+$/.test(tokens[digitTokenIndex - 1])) {
+                start = digitTokenIndex - 1;
+            }
+
+            const modelTokens = tokens.slice(start, digitTokenIndex + 1);
+            if (customToken) modelTokens.push(customToken);
+            return modelTokens.join(' ').trim();
+        }
+
+        if (customToken) {
+            const customIndex = tokens.indexOf(customToken);
+            if (customIndex > 0) {
+                return `${tokens[customIndex - 1]} ${customToken}`;
+            }
+        }
+
+        return null;
     }
 
     const NORMALIZED_SYNONYM_ENTRIES = Object.entries(SYNONYMS).map(([key, values]) => {
@@ -569,13 +591,13 @@
         const queryKeywords = query.split(/\s+/).filter((keyword) => keyword.length > 0);
         const phraseTerms = expandedQueryTerms.filter((term) => term.includes(' '));
         const hasAlternativePhrase = query.includes(' ') && phraseTerms.some((term) => term !== query);
-        const requiresWeaponPrecision = queryRequiresWeaponPrecision(query);
+        const weaponPrecisionQuery = getWeaponPrecisionQuery(query);
 
         let score = 0;
         let skipKeywordStrictMatch = false;
 
-        if (requiresWeaponPrecision) {
-            if (!matchesWeaponQuery(searchFields.descriptionRaw, query)) {
+        if (weaponPrecisionQuery) {
+            if (!matchesWeaponQuery(searchFields.descriptionRaw, weaponPrecisionQuery)) {
                 return 0;
             }
 
@@ -674,12 +696,12 @@
 
         const expandedQueryTerms = getSearchTerms(query);
         const queryKeywords = query.split(/\s+/).filter((keyword) => keyword.length > 0);
-        const requiresWeaponPrecision = queryRequiresWeaponPrecision(query);
+        const weaponPrecisionQuery = getWeaponPrecisionQuery(query);
 
         let score = 0;
 
-        if (requiresWeaponPrecision) {
-            if (!matchesWeaponQuery(searchFields.descriptionRaw, query)) {
+        if (weaponPrecisionQuery) {
+            if (!matchesWeaponQuery(searchFields.descriptionRaw, weaponPrecisionQuery)) {
                 return 0;
             }
 
