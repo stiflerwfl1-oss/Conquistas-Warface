@@ -865,6 +865,28 @@ select {
     padding: 14px 16px 16px;
 }
 
+.card__body--stripe {
+    padding-top: 12px;
+}
+
+.card__stripe-title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.card__stripe-preview {
+    width: 132px;
+    min-width: 132px;
+    height: 34px;
+    object-fit: cover;
+    border-radius: 999px;
+    border: 1px solid var(--border-subtle);
+    background: linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary));
+    padding: 2px 8px;
+}
+
 .card__name {
     font-family: var(--font-heading);
     font-size: 1.02rem;
@@ -875,6 +897,23 @@ select {
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+}
+
+.card__body--stripe .card__name {
+    margin-bottom: 0;
+}
+
+@media (max-width: 640px) {
+    .card__stripe-title-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .card__stripe-preview {
+        width: 100%;
+        min-width: 0;
+        max-width: 240px;
+    }
 }
 
 .card__description {

@@ -24,11 +24,13 @@
         ribbonsGrid: $('#ribbons-grid'),
         gridEmpty: $('#grid-empty'),
         gridLoading: $('#grid-loading'),
+        gridSection: $('.grid-section'),
         resultsCount: $('#results-count'),
         scrollTop: $('#scroll-top'),
         filterMain: $('#filter-main'),
         filterArmas: $('#filter-armas'),
         filterColor: $('#filter-color'),
+        filterTheme: $('#filter-theme'),
         armasFilterGroup: $('#armas-filter-group'),
         modal: $('#detail-modal'),
     };
@@ -42,6 +44,7 @@
         mainFilter: 'todos',
         armasFilter: 'todos',
         colorFilter: 'todos',
+        themeFilter: 'todos',
         hideEmpty: true,
         showOnlyEmpty: false,
         ribbonFilter: 'all',
@@ -115,6 +118,7 @@
     function init() {
         initTheme();
         createModal();
+        populateThemeFilterOptions();
         renderStats();
         renderGrid();
         renderRibbonsGrid();
@@ -521,6 +525,7 @@
         const imageSources = getImageSourceSet(item);
         const primaryImage = imageSources[0] || FALLBACK_SVG;
         const fallbackSources = JSON.stringify(imageSources.slice(1));
+        const showInlineRibbonPreview = typeClass === 'stripe';
 
         const tagsHtml = (item.tags || []).slice(0, 4).map(tag => {
             let tagClass = 'card__tag';
@@ -534,6 +539,21 @@
             : '';
 
         const delay = Math.min(index * 0.04, 0.6);
+        const titleContent = showInlineRibbonPreview
+            ? `<div class="card__stripe-title-row">
+                <img
+                    class="card__stripe-preview"
+                    src="${primaryImage}"
+                    data-fallback-sources='${fallbackSources.replace(/'/g, '&#39;')}'
+                    alt="${item.name}"
+                    width="132"
+                    height="34"
+                    loading="lazy"
+                    onerror="handleImageError(this)"
+                >
+                <h3 class="card__name">${item.name}</h3>
+            </div>`
+            : `<h3 class="card__name">${item.name}</h3>`;
 
         return `
         <article class="card card--${typeClass}" style="animation-delay: ${delay}s" data-id="${item.id}" tabindex="0">
@@ -551,8 +571,8 @@
                     onerror="handleImageError(this)"
                 >
             </div>
-            <div class="card__body">
-                <h3 class="card__name">${item.name}</h3>
+            <div class="card__body${showInlineRibbonPreview ? ' card__body--stripe' : ''}">
+                ${titleContent}
                 <p class="card__description">${item.description}</p>
                 <div class="card__meta">
                     ${tagsHtml}
@@ -689,6 +709,7 @@
             mainFilter: state.mainFilter,
             armasFilter: state.armasFilter,
             colorFilter: state.colorFilter,
+            themeFilter: state.themeFilter,
             searchTerm,
             resolvedOperationName,
             descriptionOnlySearch,
@@ -697,7 +718,38 @@
         };
     }
 
+    function populateThemeFilterOptions() {
+        if (!DOM.filterTheme || !filterCore || typeof filterCore.getAdvancedThemeFilters !== 'function') {
+            return;
+        }
+
+        const definitions = filterCore.getAdvancedThemeFilters();
+        const grouped = definitions.reduce((map, entry) => {
+            const group = entry.group || 'Outros';
+            if (!map[group]) map[group] = [];
+            map[group].push(entry);
+            return map;
+        }, {});
+
+        let html = '<option value="todos">Todos os temas</option>';
+
+        Object.entries(grouped).forEach(([group, entries]) => {
+            html += `<optgroup label="${group}">`;
+            entries.forEach((entry) => {
+                html += `<option value="${entry.value}">${entry.label}</option>`;
+            });
+            html += '</optgroup>';
+        });
+
+        DOM.filterTheme.innerHTML = html;
+        DOM.filterTheme.value = state.themeFilter;
+    }
+
     function getFilteredData() {
+        if (state.activeCategory === 'stripes') {
+            return [];
+        }
+
         let data = [...catalogData];
 
         switch (state.activeCategory) {
@@ -718,6 +770,8 @@
                 break;
         }
 
+        data = data.filter(item => !isRibbon(item));
+
         return filterCore.filterItems(data, buildFilterOptions(state.searchQuery));
     }
 
@@ -727,6 +781,18 @@
     let isRenderingGrid = false;
 
     function renderGrid(reset = true) {
+        syncGridSectionVisibility();
+
+        if (state.activeCategory === 'stripes') {
+            currentRenderData = [];
+            currentRenderIndex = 0;
+            if (DOM.achievementsGrid) {
+                DOM.achievementsGrid.innerHTML = '';
+            }
+            hideGridEmptyState();
+            return;
+        }
+
         if (reset) {
             currentRenderData = getFilteredData();
             currentRenderIndex = 0;
@@ -784,6 +850,10 @@
             DOM.ribbonsGrid.innerHTML = '<div class="grid__empty"><span class="grid__empty-icon">🎖️</span><h3>Nenhuma fita encontrada</h3></div>';
         } else {
             DOM.ribbonsGrid.innerHTML = stripes.map((item, i) => createCard(item, i)).join('');
+        }
+
+        if (state.activeCategory === 'stripes') {
+            setResultsCount(stripes.length);
         }
     }
 
@@ -904,6 +974,16 @@
         });
 
         refreshGridForCurrentCategory();
+        renderRibbonsGrid();
+
+        if (category === 'stripes') {
+            const ribbonsSection = document.getElementById('ribbons-section');
+            if (ribbonsSection) {
+                ribbonsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            return;
+        }
+
         scrollToGrid();
     }
 
@@ -969,6 +1049,13 @@
             renderGrid(true);
             renderRibbonsGrid();
         });
+        if (DOM.filterTheme) {
+            DOM.filterTheme.addEventListener('change', (e) => {
+                state.themeFilter = e.target.value;
+                renderGrid(true);
+                renderRibbonsGrid();
+            });
+        }
 
         safeToggleFilterGroup();
 
@@ -1057,6 +1144,11 @@
         if (DOM.gridLoading) {
             DOM.gridLoading.style.display = 'none';
         }
+    }
+
+    function syncGridSectionVisibility() {
+        if (!DOM.gridSection) return;
+        DOM.gridSection.style.display = state.activeCategory === 'stripes' ? 'none' : '';
     }
 
     // ============================================

@@ -135,6 +135,110 @@
         }
     };
 
+    const ADVANCED_THEME_FILTERS = [
+        {
+            value: 'operation_mars',
+            label: 'Operação: Marte',
+            group: 'Operações especiais',
+            terms: ['marte', 'mars']
+        },
+        {
+            value: 'operation_black_shark',
+            label: 'Operação: Tubarão Negro / Black Shark',
+            group: 'Operações especiais',
+            terms: ['black shark', 'tubarao negro']
+        },
+        {
+            value: 'operation_blackwood',
+            label: 'Operação: Blackwood',
+            group: 'Operações especiais',
+            terms: ['blackwood', 'operation blackwood', 'operacao blackwood']
+        },
+        {
+            value: 'operation_hydra',
+            label: 'Operação: Hydra',
+            group: 'Operações especiais',
+            terms: ['hydra', 'hidra']
+        },
+        {
+            value: 'operation_icebreaker',
+            label: 'Operação: Icebreaker / Pico Gelado',
+            group: 'Operações especiais',
+            terms: ['icebreaker', 'quebra gelo', 'pico gelado']
+        },
+        {
+            value: 'operation_pripyat',
+            label: 'Operação: Pripyat',
+            group: 'Operações especiais',
+            terms: ['pripyat', 'chernobyl']
+        },
+        {
+            value: 'operation_volcano',
+            label: 'Operação: Vulcão / Assalto',
+            group: 'Operações especiais',
+            terms: ['vulcao', 'volcano', 'assalto']
+        },
+        {
+            value: 'operation_swarm',
+            label: 'Operação: Enxame / Swarm',
+            group: 'Operações especiais',
+            terms: ['enxame', 'swarm']
+        },
+        {
+            value: 'operation_blackout',
+            label: 'Operação: Blecaute / Blackout',
+            group: 'Operações especiais',
+            terms: ['blecaute', 'blackout', 'escape from anubis']
+        },
+        {
+            value: 'operation_heist',
+            label: 'Operação: Fuga / Heist',
+            group: 'Operações especiais',
+            terms: ['fuga', 'heist']
+        },
+        {
+            value: 'weapon_mars',
+            label: 'Armas Marte',
+            group: 'Temas de armas',
+            terms: ['marte', 'mars'],
+            weaponOnly: true
+        },
+        {
+            value: 'weapon_yakuza',
+            label: 'Armas Yakuza',
+            group: 'Temas de armas',
+            terms: ['yakuza'],
+            weaponOnly: true
+        },
+        {
+            value: 'weapon_gold',
+            label: 'Armas Douradas / Gold',
+            group: 'Temas de armas',
+            goldOnly: true
+        },
+        {
+            value: 'weapon_atlas',
+            label: 'Armas ATLAS',
+            group: 'Temas de armas',
+            terms: ['atlas'],
+            weaponOnly: true
+        },
+        {
+            value: 'weapon_pharaoh',
+            label: 'Armas Pharaoh',
+            group: 'Temas de armas',
+            terms: ['pharaoh'],
+            weaponOnly: true
+        },
+        {
+            value: 'weapon_hidden_war',
+            label: 'Armas Hidden War',
+            group: 'Temas de armas',
+            terms: ['hidden war'],
+            weaponOnly: true
+        }
+    ];
+
     const SYNONYMS = {
         gold: ['dourado', 'dourada', 'douradas', 'golden'],
         silver: ['prateado', 'prateada', 'prateadas'],
@@ -257,11 +361,21 @@
 
     const SPEC_OPS_LOOKUP = buildSpecOpsLookup();
     const SPEC_OPS_CANONICAL_ALIASES = buildSpecOpsCanonicalAliases();
+    const ADVANCED_THEME_FILTER_INDEX = ADVANCED_THEME_FILTERS.reduce((index, entry) => {
+        index[entry.value] = Object.assign({}, entry, {
+            terms: (entry.terms || []).map((term) => normalizeSearchQuery(term)).filter(Boolean)
+        });
+        return index;
+    }, {});
 
     function resolveSpecOpsOperationName(searchTerm) {
         const normalized = normalizeSearchQuery(searchTerm);
         if (!normalized) return null;
         return SPEC_OPS_LOOKUP[normalized] || null;
+    }
+
+    function getAdvancedThemeFilters() {
+        return ADVANCED_THEME_FILTERS.map(({ value, label, group }) => ({ value, label, group }));
     }
 
     function normalizeText(str) {
@@ -821,6 +935,13 @@
         return goldTerms.some((term) => containsWholeTerm(text, term));
     }
 
+    function isWeaponChallengeItem(item) {
+        const descriptionRaw = String(item && item.description || '');
+        const description = normalizeSearchQuery(descriptionRaw);
+        return parseEliminationCount(descriptionRaw) !== null
+            || /domine a arma|com um|com uma|com o|com a|usando uma arma|usando um/.test(description);
+    }
+
     function is999EliminationsChallenge(item) {
         const requiredCount = getItemRequiredCount(item);
         if (requiredCount !== 999) return false;
@@ -862,6 +983,36 @@
         const mapRaw = normalizeSearchQuery(item && (item.mapRaw || item.map));
 
         return matchesOperationValue(operationRaw, aliases) || matchesOperationValue(mapRaw, aliases);
+    }
+
+    function matchesThemeTerms(text, terms) {
+        if (!text || terms.length === 0) return false;
+        return terms.some((term) => containsWholeTerm(text, term));
+    }
+
+    function matchesThemeFilter(item, themeFilter) {
+        if (!themeFilter || themeFilter === 'todos') return true;
+
+        const entry = ADVANCED_THEME_FILTER_INDEX[themeFilter];
+        if (!entry) return true;
+
+        if (entry.goldOnly) {
+            return isWeaponChallengeItem(item) && hasGoldReference(item && item.description);
+        }
+
+        if (entry.weaponOnly && !isWeaponChallengeItem(item)) {
+            return false;
+        }
+
+        const haystacks = [
+            normalizeSearchQuery(item && item.name),
+            normalizeSearchQuery(item && item.description),
+            normalizeSearchQuery(item && item.operationRaw),
+            normalizeSearchQuery(item && (item.mapRaw || item.map)),
+            normalizeSearchQuery(((item && item.tags) || []).join(' '))
+        ];
+
+        return haystacks.some((text) => matchesThemeTerms(text, entry.terms));
     }
 
     function matchesArmasFilter(item, armasFilter) {
@@ -944,6 +1095,7 @@
             mainFilter: 'todos',
             armasFilter: 'todos',
             colorFilter: 'todos',
+            themeFilter: 'todos',
             searchTerm: '',
             resolvedOperationName: null,
             descriptionOnlySearch: false,
@@ -963,6 +1115,10 @@
 
         if (settings.resolvedOperationName) {
             filtered = filtered.filter((item) => matchesResolvedOperationFilter(item, settings.resolvedOperationName));
+        }
+
+        if (settings.themeFilter && settings.themeFilter !== 'todos') {
+            filtered = filtered.filter((item) => matchesThemeFilter(item, settings.themeFilter));
         }
 
         if (String(settings.searchTerm || '').trim() !== '') {
@@ -1021,6 +1177,7 @@
         normalizeComparableText,
         normalizeSearchQuery,
         normalizeText,
+        getAdvancedThemeFilters,
         resolveSpecOpsOperationName,
         getSpecOpsAliasesForCanonical,
         parseEliminationCount
