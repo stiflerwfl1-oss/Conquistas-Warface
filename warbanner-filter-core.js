@@ -542,9 +542,9 @@
         }
 
         const hasFuzzyNameMatch = terms.some((term) => {
-            if (hasDigit(term)) return false;
+            if (hasDigit(term) || term.length <= 3) return false;
             return searchFields.nameTokens.some((token) => {
-                if (hasDigit(token)) return false;
+                if (hasDigit(token) || token.length <= 3) return false;
                 return levenshtein(term, token) <= 1;
             });
         });
@@ -639,8 +639,73 @@
             score += keywordScoreTotal;
         }
 
-        if (levenshtein(query, searchFields.name) <= 1) {
+        if (query.length > 3 && levenshtein(query, searchFields.name) <= 1) {
             score += 130;
+        }
+
+        return score;
+    }
+
+    function getBestDescriptionKeywordScore(searchFields, keyword) {
+        const terms = getSearchTerms(keyword);
+        if (terms.length === 0) return 0;
+
+        let bestScore = 0;
+
+        if (terms.some((term) => searchFields.description.includes(term))) {
+            bestScore = Math.max(bestScore, 180);
+        }
+
+        if (terms.some((term) => searchFields.context.includes(term))) {
+            bestScore = Math.max(bestScore, 160);
+        }
+
+        return bestScore;
+    }
+
+    function calculateDescriptionSearchRelevance(item, searchTerm) {
+        const query = normalizeSearchQuery(searchTerm);
+        if (!query) return 0;
+
+        const searchFields = getSearchFields(item);
+        if (!searchFields.description && !searchFields.context) {
+            return 0;
+        }
+
+        const expandedQueryTerms = getSearchTerms(query);
+        const queryKeywords = query.split(/\s+/).filter((keyword) => keyword.length > 0);
+        const requiresWeaponPrecision = queryRequiresWeaponPrecision(query);
+
+        let score = 0;
+
+        if (requiresWeaponPrecision) {
+            if (!matchesWeaponQuery(searchFields.descriptionRaw, query)) {
+                return 0;
+            }
+
+            score += 520;
+        }
+
+        if (expandedQueryTerms.some((term) => searchFields.description.includes(term))) {
+            score += 260;
+        }
+
+        if (expandedQueryTerms.some((term) => searchFields.context.includes(term))) {
+            score += 220;
+        }
+
+        if (queryKeywords.length > 0) {
+            let keywordScoreTotal = 0;
+
+            for (const keyword of queryKeywords) {
+                const keywordScore = getBestDescriptionKeywordScore(searchFields, keyword);
+                if (keywordScore === 0) {
+                    return score;
+                }
+                keywordScoreTotal += keywordScore;
+            }
+
+            score += keywordScoreTotal;
         }
 
         return score;
@@ -845,6 +910,7 @@
             colorFilter: 'todos',
             searchTerm: '',
             resolvedOperationName: null,
+            descriptionOnlySearch: false,
             hideEmpty: true,
             showOnlyEmpty: false
         }, options || {});
@@ -859,16 +925,24 @@
             filtered = filtered.filter((item) => String(item && item.description || '').trim() !== '');
         }
 
+        if (settings.resolvedOperationName) {
+            filtered = filtered.filter((item) => matchesResolvedOperationFilter(item, settings.resolvedOperationName));
+        }
+
         if (String(settings.searchTerm || '').trim() !== '') {
             const forceGold999Eliminations = queryHasGoldIntent(settings.searchTerm);
+            const useDescriptionOnlySearch = Boolean(settings.descriptionOnlySearch);
+            const includeAllResolvedOperationItems = Boolean(settings.resolvedOperationName && useDescriptionOnlySearch);
 
             const scoredItems = filtered
                 .map((item, index) => ({
                     item,
                     index,
-                    score: calculateSearchRelevance(item, settings.searchTerm)
+                    score: useDescriptionOnlySearch
+                        ? calculateDescriptionSearchRelevance(item, settings.searchTerm)
+                        : calculateSearchRelevance(item, settings.searchTerm)
                 }))
-                .filter((entry) => entry.score > 0)
+                .filter((entry) => entry.score > 0 || includeAllResolvedOperationItems)
                 .filter((entry) => {
                     if (!forceGold999Eliminations) return true;
                     return is999EliminationsChallenge(entry.item);
@@ -881,10 +955,6 @@
                 });
 
             filtered = scoredItems.map((entry) => entry.item);
-        }
-
-        if (settings.resolvedOperationName) {
-            filtered = filtered.filter((item) => matchesResolvedOperationFilter(item, settings.resolvedOperationName));
         }
 
         filtered = filtered.filter((item) => matchesMainFilter(item, settings.mainFilter, settings.armasFilter));

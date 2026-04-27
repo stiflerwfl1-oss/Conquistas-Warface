@@ -669,12 +669,18 @@
     }
 
     function buildFilterOptions(searchTerm) {
+        const resolvedOperationName = resolveOperationAlias(searchTerm);
+        const descriptionOnlySearch = state.activeCategory === 'specops'
+            || state.mainFilter === 'pve'
+            || Boolean(resolvedOperationName);
+
         return {
             mainFilter: state.mainFilter,
             armasFilter: state.armasFilter,
             colorFilter: state.colorFilter,
             searchTerm,
-            resolvedOperationName: resolveOperationAlias(searchTerm),
+            resolvedOperationName,
+            descriptionOnlySearch,
             hideEmpty: state.hideEmpty,
             showOnlyEmpty: state.showOnlyEmpty,
         };
