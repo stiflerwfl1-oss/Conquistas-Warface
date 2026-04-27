@@ -111,6 +111,64 @@
         return /\d/.test(String(value || ''));
     }
 
+    function normalizeText(str) {
+        if (str == null) return '';
+        return String(str)
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function escapeRegExp(str) {
+        return String(str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    const CUSTOM_MARKERS = new Set([
+        'custom',
+        'customizado',
+        'customizada',
+        'personalizado',
+        'personalizada'
+    ]);
+
+    function matchesWeaponQuery(description, query) {
+        const d = normalizeText(description);
+        const q = normalizeText(query);
+        if (!d || !q) return false;
+
+        const queryTokens = q.split(' ').filter(Boolean);
+        const queryWantsCustom = queryTokens.some((token) => CUSTOM_MARKERS.has(token));
+
+        const phrase = escapeRegExp(q).replace(/\s+/g, '\\s+');
+        const regex = new RegExp(`(?:^|\\s)(${phrase})(?=$|\\s)`, 'g');
+
+        let match;
+        while ((match = regex.exec(d)) !== null) {
+            if (queryWantsCustom) return true;
+
+            const after = d.slice(match.index + match[0].length).trimStart();
+            const nextToken = after.split(' ', 1)[0];
+            if (CUSTOM_MARKERS.has(nextToken)) continue;
+
+            return true;
+        }
+
+        return false;
+    }
+
+    function queryRequiresWeaponPrecision(query) {
+        const normalized = normalizeText(query);
+        if (!normalized) return false;
+
+        if (hasDigit(normalized)) return true;
+
+        const tokens = normalized.split(' ').filter(Boolean);
+        return tokens.some((token) => CUSTOM_MARKERS.has(token));
+    }
+
     const NORMALIZED_SYNONYM_ENTRIES = Object.entries(SYNONYMS).map(([key, values]) => {
         return [
             normalizeComparableText(key),
@@ -200,6 +258,7 @@
         const tags = ((item && item.tags) || [])
             .map((tag) => normalizeComparableText(tag))
             .filter(Boolean);
+        const descriptionRaw = String(item && item.description || '');
         const description = normalizeComparableText(item && item.description);
         const operation = normalizeComparableText(item && item.operationRaw);
         const mode = normalizeComparableText(item && item.mode);
@@ -216,6 +275,7 @@
         return {
             name,
             tags,
+            descriptionRaw,
             description,
             operation,
             mode,
@@ -280,9 +340,18 @@
         const queryKeywords = query.split(/\s+/).filter((keyword) => keyword.length > 0);
         const phraseTerms = expandedQueryTerms.filter((term) => term.includes(' '));
         const hasAlternativePhrase = query.includes(' ') && phraseTerms.some((term) => term !== query);
+        const requiresWeaponPrecision = queryRequiresWeaponPrecision(query);
 
         let score = 0;
         let skipKeywordStrictMatch = false;
+
+        if (requiresWeaponPrecision) {
+            if (!matchesWeaponQuery(searchFields.descriptionRaw, query)) {
+                return 0;
+            }
+
+            score += 520;
+        }
 
         if (searchFields.name === query) {
             score += 700;
@@ -578,9 +647,11 @@
         hasWarbannerSearchMatch,
         is999EliminationsChallenge,
         levenshtein,
+        matchesWeaponQuery,
         matchesArmasFilter,
         matchesMainFilter,
         normalizeComparableText,
+        normalizeText,
         parseEliminationCount
     };
 
