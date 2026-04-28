@@ -526,12 +526,16 @@ async function sendPayloads(target, payloads, mode) {
   }
 }
 
-async function main() {
+async function main(options = {}) {
+  const { startHealthServer: shouldStartHealthServer = true } = options;
+
   if (!process.env.DISCORD_TOKEN) {
     throw new Error('Defina DISCORD_TOKEN antes de iniciar o bot.');
   }
 
-  startHealthServer();
+  if (shouldStartHealthServer) {
+    startHealthServer();
+  }
   await reloadData();
 
   const searchCommand = new SlashCommandBuilder()
@@ -661,6 +665,7 @@ if (require.main === module) {
     readLocalData,
     resolveChallengeImage,
     searchChallenges,
+    startBot: main,
     setAchievementsDataForTest(data) {
       achievementsData = Array.isArray(data) ? data : [];
       catalogData = buildCatalogData(achievementsData);
