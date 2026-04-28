@@ -545,7 +545,6 @@
         const normalizedTerm = normalizeComparableText(term);
         if (!normalizedTerm) return [];
 
-        // Numeric/alphanumeric weapon codes must stay exact (e.g. m14 != m17).
         if (hasDigit(normalizedTerm)) {
             return [normalizedTerm];
         }
@@ -561,7 +560,6 @@
         return [...new Set(result)];
     }
 
-    // Backward compatibility for existing integrations.
     function expandWithSynonyms(term) {
         return getSearchTerms(term);
     }
@@ -847,12 +845,10 @@
         return score;
     }
 
-    // Backward compatibility for existing integrations.
     function getSynonyms(query) {
         return getSearchTerms(query);
     }
 
-    // Backward compatibility for existing integrations.
     function distance(s1, s2) {
         return levenshtein(s1, s2);
     }
@@ -973,6 +969,20 @@
         });
     }
 
+    function matchesOperationContextPhrase(text, alias) {
+        if (!text || !alias) return false;
+
+        const pattern = escapeRegExp(alias).replace(/\s+/g, '\\s+');
+        const contextPatterns = [
+            `(?:missao|operacao|mission|operation|spec\\s+ops|specops|special\\s+operations?|co\\s+op|coop)(?:\\s+especial)?\\s+${pattern}(?=$|\\s)`,
+            `(?:conclua|complete|venca|termine)\\s+(?:a\\s+)?(?:(?:missao|operacao)(?:\\s+especial)?\\s+)?${pattern}(?=$|\\s)`,
+            `(?:em|na|no)\\s+${pattern}(?=$|\\s)`,
+            `cartas\\s+colecionaveis\\s+(?:de|do|da)\\s+${pattern}(?=$|\\s)`
+        ];
+
+        return contextPatterns.some((rawPattern) => new RegExp(rawPattern).test(text));
+    }
+
     function matchesResolvedOperationFilter(item, resolvedOperationName) {
         if (!resolvedOperationName) return true;
 
@@ -981,8 +991,16 @@
 
         const operationRaw = normalizeSearchQuery(item && item.operationRaw);
         const mapRaw = normalizeSearchQuery(item && (item.mapRaw || item.map));
+        const contextualText = normalizeSearchQuery([
+            item && item.description,
+            item && item.operationRaw,
+            item && (item.mapRaw || item.map),
+            item && item.mode
+        ].filter(Boolean).join(' '));
 
-        return matchesOperationValue(operationRaw, aliases) || matchesOperationValue(mapRaw, aliases);
+        return matchesOperationValue(operationRaw, aliases)
+            || matchesOperationValue(mapRaw, aliases)
+            || aliases.some((alias) => matchesOperationContextPhrase(contextualText, alias));
     }
 
     function matchesThemeTerms(text, terms) {

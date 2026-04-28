@@ -14,10 +14,14 @@ const DEFAULT_GITHUB_OWNER = 'stiflerwfl1-oss';
 const DEFAULT_GITHUB_REPO = 'Conquistas-Warface';
 const SEARCH_COMMAND_NAME = 'conquista';
 const PORT = Number(process.env.PORT || 3000);
+const MAX_EMBEDS_PER_MESSAGE = 10;
+const MAX_RESULTS_PER_SEARCH = 30;
 
 loadEnvFile();
 
 const REFRESH_MINUTES = Number(process.env.DATA_REFRESH_MINUTES || 10);
+const NO_RESULT_LIMIT = 3;
+const NO_RESULT_TIMEOUT_MS = 5 * 60 * 1000;
 const DISCORD_ALLOWED_CHANNEL_IDS = String(process.env.DISCORD_ALLOWED_CHANNEL_IDS || '')
   .split(',')
   .map((id) => id.trim())
@@ -25,9 +29,11 @@ const DISCORD_ALLOWED_CHANNEL_IDS = String(process.env.DISCORD_ALLOWED_CHANNEL_I
 const GITHUB_DATA_URL = resolveGithubDataUrl();
 
 let achievementsData = [];
+let catalogData = [];
 let lastDataSource = 'none';
 const warbannerMetadata = loadMetadataMap();
 const imageReachabilityCache = new Map();
+const noResultStreakByUser = new Map();
 
 function loadEnvFile() {
   if (!fs.existsSync(ENV_FILE)) return;
@@ -207,6 +213,7 @@ async function reloadData() {
     try {
       const remoteSource = await fetchText(GITHUB_DATA_URL);
       achievementsData = parseAchievementsFromSource(remoteSource, 'GitHub');
+      catalogData = buildCatalogData(achievementsData);
       lastDataSource = `github:${GITHUB_DATA_URL}`;
       console.log(`[data] ${achievementsData.length} desafios carregados de ${lastDataSource}`);
       return;
@@ -216,6 +223,7 @@ async function reloadData() {
   }
 
   achievementsData = readLocalData();
+  catalogData = buildCatalogData(achievementsData);
   lastDataSource = 'local:data.js';
   console.log(`[data] ${achievementsData.length} desafios carregados de ${lastDataSource}`);
 }
@@ -235,28 +243,62 @@ function formatChallengeLine(item) {
   return `${goldPrefix}**${item.name}** (${typeLabel})\n${item.description || 'Sem descricao.'}`;
 }
 
-function buildSearchPayload(query, results, resolved) {
-  const topResults = results.slice(0, 10).map(formatChallengeLine).join('\n\n');
-  const hasMore = results.length > 10 ? `\n\n... e mais ${results.length - 10} resultado(s).` : '';
-  const topItem = resolved.item;
-  const topType = getTypeLabel(topItem.type);
+function getEmbedColor(type) {
+  const canonicalType = filterCore.getCanonicalType(type);
+  if (canonicalType === 'fita') return 0xd4a843;
+  if (canonicalType === 'insignia') return 0x4aa3df;
+  if (canonicalType === 'marca') return 0x6cc070;
+  return 0x8a8f98;
+}
 
-  const payload = {
-    content: `[BUSCA] **Resultados para:** "${query}"\n\n${topResults}${hasMore}`,
+function buildChallengeEmbed(item, imageUrl) {
+  const typeLabel = getTypeLabel(item.type);
+  const embed = {
+    title: `${item.name} (${typeLabel})`,
+    description: item.description || 'Sem descricao.',
+    color: getEmbedColor(item.type),
   };
 
-  if (resolved.imageUrl) {
-    payload.embeds = [
-      {
-        title: `${topItem.name} (${topType})`,
-        description: topItem.description || 'Sem descricao.',
-        image: { url: resolved.imageUrl },
-        color: 0xd4a843,
-      },
-    ];
+  if (imageUrl) {
+    embed.image = { url: imageUrl };
   }
 
-  return payload;
+  return embed;
+}
+
+function chunkArray(items, chunkSize) {
+  const chunks = [];
+
+  for (let index = 0; index < items.length; index += chunkSize) {
+    chunks.push(items.slice(index, index + chunkSize));
+  }
+
+  return chunks;
+}
+
+function buildSearchPayloads(query, results, resolvedResults) {
+  const chunks = chunkArray(resolvedResults, MAX_EMBEDS_PER_MESSAGE);
+  const displayedCount = resolvedResults.length;
+  const totalCount = results.length;
+
+  return chunks.map((chunk, chunkIndex) => {
+    const start = chunkIndex * MAX_EMBEDS_PER_MESSAGE + 1;
+    const end = start + chunk.length - 1;
+    const chunkLabel =
+      chunks.length > 1 ? `\nLote ${chunkIndex + 1}/${chunks.length} (${start}-${end}).` : '';
+    const trimmedLabel =
+      totalCount > displayedCount
+        ? `\nExibindo ${displayedCount} de ${totalCount} resultados. Refine a busca para ver menos itens por vez.`
+        : '';
+
+    return {
+      content:
+        chunkIndex === 0
+          ? `[BUSCA] Resultados para "${query}": ${totalCount} desafio(s).${chunkLabel}${trimmedLabel}`
+          : `[BUSCA] Continuação de "${query}".${chunkLabel}`,
+      embeds: chunk.map(({ item, imageUrl }) => buildChallengeEmbed(item, imageUrl)),
+    };
+  });
 }
 
 function extractFilenameFromValue(value) {
@@ -283,6 +325,27 @@ function resolveMetadataEntry(filename) {
   }
 
   return null;
+}
+
+function buildCatalogData(items) {
+  return (Array.isArray(items) ? items : []).map((item) => {
+    const filename =
+      extractFilenameFromValue(item?.image) ||
+      extractFilenameFromValue(item?.fallbackOriginalUrl);
+    const metadata = resolveMetadataEntry(filename);
+
+    return {
+      ...item,
+      filename,
+      name: metadata && metadata.name ? metadata.name : item.name,
+      description: metadata && metadata.description ? metadata.description : item.description,
+      amount: metadata && metadata.amount !== '' ? metadata.amount : (item.objective ?? ''),
+      color: metadata && metadata.color ? metadata.color : 'outro',
+      warbannerCategory: metadata
+        ? metadata.category
+        : filterCore.getWarbannerCategory(item),
+    };
+  });
 }
 
 function normalizeImageUrl(value) {
@@ -366,40 +429,101 @@ function checkImageReachable(url) {
   });
 }
 
-async function resolveBestImageResult(results) {
-  const topResults = results.slice(0, 10);
-  for (const item of topResults) {
-    const candidates = getChallengeImageCandidates(item);
-    for (const imageUrl of candidates) {
-      if (await checkImageReachable(imageUrl)) {
-        return { item, imageUrl };
-      }
+async function resolveChallengeImage(item) {
+  const candidates = getChallengeImageCandidates(item);
+
+  for (const imageUrl of candidates) {
+    if (await checkImageReachable(imageUrl)) {
+      return imageUrl;
     }
   }
 
-  return { item: results[0], imageUrl: null };
+  return null;
 }
 
-async function buildSearchResponse(query) {
-  const results = searchChallenges(query);
-  if (results.length === 0) return null;
+async function handleNoResultAndMaybeTimeout(message) {
+  const previous = noResultStreakByUser.get(message.author.id) || 0;
+  const next = previous + 1;
+  noResultStreakByUser.set(message.author.id, next);
 
-  const resolved = await resolveBestImageResult(results);
-  return buildSearchPayload(query, results, resolved);
+  if (next < NO_RESULT_LIMIT) return;
+
+  noResultStreakByUser.set(message.author.id, 0);
+  try {
+    if (message.member && message.member.moderatable) {
+      await message.member.timeout(
+        NO_RESULT_TIMEOUT_MS,
+        '3 buscas consecutivas sem resultado no bot de desafios.'
+      );
+      await message.channel.send(
+        `${message.author}, voce recebeu timeout de 5 minutos por 3 buscas sem resultado seguidas.`
+      );
+    }
+  } catch (error) {
+    console.error('[discord] Falha ao aplicar timeout por buscas sem resultado:', error);
+  }
+}
+
+function resetNoResultStreak(userId) {
+  if (noResultStreakByUser.has(userId)) {
+    noResultStreakByUser.delete(userId);
+  }
+}
+
+async function buildSearchResponses(query) {
+  const results = searchChallenges(query);
+  if (results.length === 0) return [];
+
+  const limitedResults = results.slice(0, MAX_RESULTS_PER_SEARCH);
+  const resolvedResults = [];
+
+  for (const item of limitedResults) {
+    const imageUrl = await resolveChallengeImage(item);
+    resolvedResults.push({ item, imageUrl });
+  }
+
+  return buildSearchPayloads(query, results, resolvedResults);
 }
 
 function searchChallenges(query) {
   const normalized = normalizeSearchQuery(query);
-  if (!normalized || normalized.length < 3) return [];
+  if (!normalized || normalized.length < 2) return [];
 
-  return filterCore.filterItems(achievementsData, {
+  const resolvedOperationName =
+    typeof filterCore.resolveSpecOpsOperationName === 'function'
+      ? filterCore.resolveSpecOpsOperationName(query)
+      : null;
+  const descriptionOnlySearch = Boolean(resolvedOperationName);
+
+  return filterCore.filterItems(catalogData, {
     mainFilter: 'todos',
     armasFilter: 'todos',
     colorFilter: 'todos',
-    searchTerm: normalized,
+    searchTerm: query,
+    resolvedOperationName,
+    descriptionOnlySearch,
     hideEmpty: true,
     showOnlyEmpty: false,
   });
+}
+
+async function sendPayloads(target, payloads, mode) {
+  if (!Array.isArray(payloads) || payloads.length === 0) return;
+
+  if (mode === 'interaction') {
+    const [firstPayload, ...otherPayloads] = payloads;
+    await target.editReply(firstPayload);
+
+    for (const payload of otherPayloads) {
+      await target.followUp(payload);
+    }
+
+    return;
+  }
+
+  for (const payload of payloads) {
+    await target.send(payload);
+  }
 }
 
 async function main() {
@@ -468,14 +592,14 @@ async function main() {
 
     try {
       await interaction.deferReply();
-      const payload = await buildSearchResponse(query);
+      const payloads = await buildSearchResponses(query);
 
-      if (!payload) {
+      if (payloads.length === 0) {
         await interaction.editReply(`Nenhum resultado encontrado para "${query}".`);
         return;
       }
 
-      await interaction.editReply(payload);
+      await sendPayloads(interaction, payloads, 'interaction');
     } catch (error) {
       console.error('[discord] Erro ao processar slash command:', error);
 
@@ -499,9 +623,13 @@ async function main() {
     if (!content) return;
 
     try {
-      const payload = await buildSearchResponse(content);
-      if (!payload) return;
-      await message.channel.send(payload);
+      const payloads = await buildSearchResponses(content);
+      if (payloads.length === 0) {
+        await handleNoResultAndMaybeTimeout(message);
+        return;
+      }
+      resetNoResultStreak(message.author.id);
+      await sendPayloads(message.channel, payloads, 'channel');
     } catch (error) {
       if (error.code === 50013) {
         console.error('[discord] Sem permissão para enviar mensagem no canal:', message.channelId);
@@ -521,7 +649,21 @@ async function main() {
   await client.login(process.env.DISCORD_TOKEN);
 }
 
-main().catch((error) => {
-  console.error('[fatal]', error);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error('[fatal]', error);
+    process.exitCode = 1;
+  });
+} else {
+  module.exports = {
+    buildSearchResponses,
+    getChallengeImageCandidates,
+    readLocalData,
+    resolveChallengeImage,
+    searchChallenges,
+    setAchievementsDataForTest(data) {
+      achievementsData = Array.isArray(data) ? data : [];
+      catalogData = buildCatalogData(achievementsData);
+    },
+  };
+}
