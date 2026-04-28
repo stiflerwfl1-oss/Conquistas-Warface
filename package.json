@@ -1,14 +1,18 @@
 {
-  "name": "conquistas-warface-bot",
+  "name": "conquistas-warface",
   "version": "1.0.0",
-  "private": true,
+  "description": "Site de Conquistas Warface",
+  "main": "server.js",
   "scripts": {
-    "start": "node bot.js"
+    "start": "node server.js",
+    "bot-start": "node bot.js"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
-    "discord.js": "^14.21.0"
+    "discord.js": "^14.21.0",
+    "express": "^4.18.2",
+    "node-fetch": "^2.7.0"
   }
 }
