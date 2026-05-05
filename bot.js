@@ -104,6 +104,49 @@ const OPERATION_TERMS = [
   'marte',
 ];
 
+const SECRET_FILTER_SYNONYMS = [
+  'desafio secreto',
+  'desafios secretos',
+  'desafio de segredo',
+  'desafios de segredo',
+  'secret challenge',
+  'secret challenges',
+  'special secret challenge',
+  'special secret challenges',
+  'desafios secretos especiais',
+  'segredo',
+  'segredos',
+  'secreto',
+  'secretos',
+];
+
+const SECRET_CHALLENGE_IMAGE_KEYS_IN_ORDER = [
+  'challenge_mark_secret_01',
+  'challenge_mark_secret_02',
+  'challenge_mark_secret_03',
+  'challenge_mark_secret_04',
+  'challenge_mark_secret_05',
+  'challenge_mark_chernobil_07',
+  'challenge_mark_chernobil_03',
+  'challenge_mark_chernobil_06',
+  'challenge_mark_chernobil_04',
+  'challenge_mark_chernobil_05',
+];
+
+const SECRET_FILTER_TOKEN_SET = new Set([
+  'desafio',
+  'desafios',
+  'secreto',
+  'secretos',
+  'segredo',
+  'segredos',
+  'secret',
+  'challenge',
+  'challenges',
+  'special',
+  'especiais',
+]);
+
 function loadEnvFile() {
   if (!fs.existsSync(ENV_FILE)) return;
 
@@ -245,6 +288,40 @@ function hasWholePhrase(text, phrase) {
 
 function hasAnyWholePhrase(text, phrases) {
   return (phrases || []).some((phrase) => hasWholePhrase(text, phrase));
+}
+
+function isSecretChallengesQuery(query) {
+  const normalized = normalizeText(query);
+  if (!normalized) return false;
+  return SECRET_FILTER_SYNONYMS.some((term) => hasWholePhrase(normalized, term));
+}
+
+function getSecretSortIndex(item) {
+  const text = normalizeText(`${item?.image || ''} ${item?.fallbackOriginalUrl || ''}`);
+  const index = SECRET_CHALLENGE_IMAGE_KEYS_IN_ORDER.findIndex((key) => text.includes(normalizeText(key)));
+  return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+}
+
+function isSecretChallengeItem(item) {
+  const imageText = normalizeText(`${item?.image || ''} ${item?.fallbackOriginalUrl || ''}`);
+  return SECRET_CHALLENGE_IMAGE_KEYS_IN_ORDER.some((key) => imageText.includes(normalizeText(key)));
+}
+
+function getSecretChallengesResults(items, query) {
+  const terms = splitNormalizedTerms(query).filter((term) => !SECRET_FILTER_TOKEN_SET.has(term));
+  const secretItems = (Array.isArray(items) ? items : []).filter(isSecretChallengeItem);
+  const filtered = terms.length === 0
+    ? secretItems
+    : secretItems.filter((item) => {
+        const text = normalizeText(`${item?.name || ''} ${item?.description || ''}`);
+        return terms.every((term) => text.includes(term));
+      });
+
+  return filtered.sort((left, right) => {
+    const orderDiff = getSecretSortIndex(left) - getSecretSortIndex(right);
+    if (orderDiff !== 0) return orderDiff;
+    return String(left?.name || '').localeCompare(String(right?.name || ''));
+  });
 }
 
 function getCanonicalItemType(item) {
@@ -1008,6 +1085,61 @@ function buildSmartSearchPayloads(query, smartGroups, resolvedResults) {
   });
 }
 
+function getDisplayImageUrl(item) {
+  const candidates = getChallengeImageCandidates(item);
+  return candidates[0] || '';
+}
+
+function buildGroupedTypePayloads(query, results, options = {}) {
+  const { contentLines = [], components = null } = options;
+  const grouped = {
+    marca: [],
+    fita: [],
+    insignia: [],
+  };
+
+  for (const item of results) {
+    const type = getCanonicalItemType(item);
+    if (type === 'marca') grouped.marca.push(item);
+    else if (type === 'fita') grouped.fita.push(item);
+    else if (type === 'insignia') grouped.insignia.push(item);
+  }
+
+  const makeEmbed = (type, title, items) => {
+    const lines = items.length === 0
+      ? ['Nenhum desafio neste grupo.']
+      : items.map((item) => {
+          const imageUrl = getDisplayImageUrl(item);
+          const imageLine = imageUrl ? `\nImagem: ${imageUrl}` : '';
+          return `- **${item.name}**\n${item.description || 'Sem descricao.'}${imageLine}`;
+        });
+
+    return {
+      title,
+      description: lines.join('\n\n').slice(0, 4096),
+      color: getEmbedColor(type),
+    };
+  };
+
+  const payload = {
+    content: [
+      `[BUSCA] Resultados para "${query}": ${results.length} desafio(s).`,
+      ...contentLines,
+    ].filter(Boolean).join('\n'),
+    embeds: [
+      makeEmbed('marca', 'Marcas', grouped.marca),
+      makeEmbed('fita', 'Fitas', grouped.fita),
+      makeEmbed('insignia', 'Insignias', grouped.insignia),
+    ],
+  };
+
+  if (components) {
+    payload.components = components;
+  }
+
+  return [payload];
+}
+
 function extractFilenameFromValue(value) {
   if (!value) return '';
   const normalized = String(value).split('?')[0].trim();
@@ -1158,19 +1290,38 @@ async function buildSearchResponses(query) {
 
   const smartGroups = buildSmartSearchGroups(query, results);
   const finalResults = [...smartGroups.primary, ...smartGroups.related].slice(0, MAX_RESULTS_PER_SEARCH);
-  const resolvedResults = [];
+  const variantMenu =
+    smartGroups.mode === 'weapon' && smartGroups.parsedQuery?.isGenericWeaponSearch
+      ? buildVariantSelectMenu(smartGroups.parsedQuery.weaponTerm || query, smartGroups.variants || [])
+      : null;
+  const contentLines = [];
 
-  for (const item of finalResults) {
-    const imageUrl = await resolveChallengeImage(item);
-    resolvedResults.push({ item, imageUrl });
+  if (smartGroups.mode === 'weapon') {
+    contentLines.push(smartGroups.title);
+    if (smartGroups.related.length > 0) {
+      contentLines.push('Tambem encontrei resultados relacionados abaixo.');
+    }
+    if (variantMenu) {
+      contentLines.push('Quer ver outras versoes? Escolha abaixo:');
+    }
+  } else if (smartGroups.mode === 'operation') {
+    contentLines.push(smartGroups.title);
+    contentLines.push('Ordenado por: Fitas -> Insignias -> Marcas');
   }
 
-  return buildSmartSearchPayloads(query, smartGroups, resolvedResults);
+  return buildGroupedTypePayloads(query, finalResults, {
+    contentLines,
+    components: variantMenu ? [variantMenu] : null,
+  });
 }
 
 function searchChallenges(query) {
   const normalized = normalizeSearchQuery(query);
   if (!normalized || normalized.length < 2) return [];
+
+  if (isSecretChallengesQuery(query)) {
+    return getSecretChallengesResults(catalogData, query);
+  }
 
   const resolvedOperationName =
     typeof filterCore.resolveSpecOpsOperationName === 'function'
@@ -1393,7 +1544,9 @@ if (require.main === module) {
     buildSearchResponses,
     getCanonicalItemType,
     getChallengeImageCandidates,
+    getSecretChallengesResults,
     isGoldItem,
+    isSecretChallengesQuery,
     isVariantItem,
     isWeaponLikeQuery,
     itemMentionsWeapon,

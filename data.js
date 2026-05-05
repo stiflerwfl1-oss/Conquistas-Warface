@@ -4878,7 +4878,7 @@ const achievementsData = [
     {
         "id": "local_ach_324",
         "name": "Fogo Pato",
-        "description": "É um desafio secreto. Ninguém sabe como obter isto.",
+        "description": "**Desafio Secreto:** Encontre o pato de Fuzileiro em Pripyat. Ele aparece ao abrir a porta do predio da Piscina Azure.",
         "objective": 1,
         "image": "./assets/images/challenge_mark_chernobil_03.png",
         "fallbackOriginalUrl": null,
@@ -4893,7 +4893,7 @@ const achievementsData = [
     {
         "id": "local_ach_325",
         "name": "Pato no Mato",
-        "description": "É um desafio secreto. Ninguém sabe como obter isto.",
+        "description": "**Desafio Secreto:** Encontre o pato de Engenheiro em Pripyat. Ele aparece ao abrir a porta de uma das salas da escola.",
         "objective": 1,
         "image": "./assets/images/challenge_mark_chernobil_04.png",
         "fallbackOriginalUrl": null,
@@ -4908,7 +4908,7 @@ const achievementsData = [
     {
         "id": "local_ach_326",
         "name": "Apate-se e Proteja-se",
-        "description": "É um desafio secreto. Ninguém sabe como obter isto.",
+        "description": "**Desafio Secreto:** Encontre o pato de Franco-atirador em Pripyat. Ele aparece ao abrir a porta do hotel.",
         "objective": 1,
         "image": "./assets/images/challenge_mark_chernobil_05.png",
         "fallbackOriginalUrl": null,
@@ -4923,7 +4923,7 @@ const achievementsData = [
     {
         "id": "local_ach_327",
         "name": "Tiro no Pato",
-        "description": "É um desafio secreto. Ninguém sabe como obter isto.",
+        "description": "**Desafio Secreto:** Encontre o pato de Medico em Pripyat. Ele aparece ao abrir a porta do predio no portao da Torre Sismica.",
         "objective": 1,
         "image": "./assets/images/challenge_mark_chernobil_06.png",
         "fallbackOriginalUrl": null,
@@ -4938,7 +4938,7 @@ const achievementsData = [
     {
         "id": "local_ach_328",
         "name": "Sósia",
-        "description": "É um desafio secreto. Ninguém sabe como obter isto.",
+        "description": "**Desafio Secreto:** Acerte o alvo no topo do onibus depois de atirar em todos os seis sinos da escola.",
         "objective": 1,
         "image": "./assets/images/challenge_mark_chernobil_07.png",
         "fallbackOriginalUrl": null,
@@ -13333,7 +13333,7 @@ const achievementsData = [
     {
         "id": "local_ach_887",
         "name": "Algo Errado Não Está Certo",
-        "description": "Desafio secreto. Como obtê-lo? A única dica é o contador...",
+        "description": "**Desafio Secreto:** Elimine a si mesmo ou aliados 20 vezes usando minas.",
         "objective": 20,
         "image": "./assets/images/challenge_mark_secret_01.png",
         "fallbackOriginalUrl": null,
@@ -13348,7 +13348,7 @@ const achievementsData = [
     {
         "id": "local_ach_888",
         "name": "Calibre Grosso",
-        "description": "Desafio secreto. Como obtê-lo? A única dica é o contador...",
+        "description": "**Desafio Secreto:** Elimine 10 Atiradores Pesados usando armas corpo a corpo.",
         "objective": 10,
         "image": "./assets/images/challenge_mark_secret_02.png",
         "fallbackOriginalUrl": null,
@@ -13363,7 +13363,7 @@ const achievementsData = [
     {
         "id": "local_ach_889",
         "name": "Esmagador de Cabeças",
-        "description": "Desafio secreto. Como obtê-lo? A única dica é o contador...",
+        "description": "**Desafio Secreto:** Realize 100 tiros na cabeca enquanto desliza no PvP.",
         "objective": 100,
         "image": "./assets/images/challenge_mark_secret_03.png",
         "fallbackOriginalUrl": null,
@@ -13378,7 +13378,7 @@ const achievementsData = [
     {
         "id": "local_ach_890",
         "name": "Último salto",
-        "description": "Desafio secreto: o contador é a única pista.",
+        "description": "**Desafio Secreto:** Elimine 1.000 inimigos enquanto eles estiverem pulando.",
         "objective": 1000,
         "image": "./assets/images/challenge_mark_secret_04.png",
         "fallbackOriginalUrl": null,
@@ -13393,7 +13393,7 @@ const achievementsData = [
     {
         "id": "local_ach_891",
         "name": "Raticida",
-        "description": "Desafio secreto: o contador é a única pista.",
+        "description": "**Desafio Secreto:** Elimine 1.000 inimigos enquanto estiverem deitados (prone).",
         "objective": 1000,
         "image": "./assets/images/challenge_mark_secret_05.png",
         "fallbackOriginalUrl": null,

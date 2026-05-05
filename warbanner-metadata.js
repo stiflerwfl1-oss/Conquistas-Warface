@@ -3422,7 +3422,7 @@ window.warbannerMetadata = {
   "challenge_mark_chernobil_03.png": {
     "category": "marcas",
     "name": "Fogo Pato",
-    "description": "É um desafio secreto. Ninguém sabe como obter isto.",
+    "description": "**Desafio Secreto:** Encontre o pato de Fuzileiro em Pripyat. Ele aparece ao abrir a porta do predio da Piscina Azure.",
     "amount": "1",
     "filename": "challenge_mark_chernobil_03.png",
     "url": "/media/desafios/marcas/challenge_mark_chernobil_03.png",
@@ -3431,7 +3431,7 @@ window.warbannerMetadata = {
   "challenge_mark_chernobil_04.png": {
     "category": "marcas",
     "name": "Pato no Mato",
-    "description": "É um desafio secreto. Ninguém sabe como obter isto.",
+    "description": "**Desafio Secreto:** Encontre o pato de Engenheiro em Pripyat. Ele aparece ao abrir a porta de uma das salas da escola.",
     "amount": "1",
     "filename": "challenge_mark_chernobil_04.png",
     "url": "/media/desafios/marcas/challenge_mark_chernobil_04.png",
@@ -3440,7 +3440,7 @@ window.warbannerMetadata = {
   "challenge_mark_chernobil_05.png": {
     "category": "marcas",
     "name": "Apate-se e Proteja-se",
-    "description": "É um desafio secreto. Ninguém sabe como obter isto.",
+    "description": "**Desafio Secreto:** Encontre o pato de Franco-atirador em Pripyat. Ele aparece ao abrir a porta do hotel.",
     "amount": "1",
     "filename": "challenge_mark_chernobil_05.png",
     "url": "/media/desafios/marcas/challenge_mark_chernobil_05.png",
@@ -3449,7 +3449,7 @@ window.warbannerMetadata = {
   "challenge_mark_chernobil_06.png": {
     "category": "marcas",
     "name": "Tiro no Pato",
-    "description": "É um desafio secreto. Ninguém sabe como obter isto.",
+    "description": "**Desafio Secreto:** Encontre o pato de Medico em Pripyat. Ele aparece ao abrir a porta do predio no portao da Torre Sismica.",
     "amount": "1",
     "filename": "challenge_mark_chernobil_06.png",
     "url": "/media/desafios/marcas/challenge_mark_chernobil_06.png",
@@ -3458,7 +3458,7 @@ window.warbannerMetadata = {
   "challenge_mark_chernobil_07.png": {
     "category": "marcas",
     "name": "Sósia",
-    "description": "É um desafio secreto. Ninguém sabe como obter isto.",
+    "description": "**Desafio Secreto:** Acerte o alvo no topo do onibus depois de atirar em todos os seis sinos da escola.",
     "amount": "1",
     "filename": "challenge_mark_chernobil_07.png",
     "url": "/media/desafios/marcas/challenge_mark_chernobil_07.png",
@@ -8777,7 +8777,7 @@ window.warbannerMetadata = {
   "challenge_mark_secret_01.png": {
     "category": "marcas",
     "name": "Algo Errado Não Está Certo",
-    "description": "Desafio secreto. Como obtê-lo? A única dica é o contador...",
+    "description": "**Desafio Secreto:** Elimine a si mesmo ou aliados 20 vezes usando minas.",
     "amount": "20",
     "filename": "challenge_mark_secret_01.png",
     "url": "/media/desafios/marcas/challenge_mark_secret_01.png",
@@ -8786,7 +8786,7 @@ window.warbannerMetadata = {
   "challenge_mark_secret_02.png": {
     "category": "marcas",
     "name": "Calibre Grosso",
-    "description": "Desafio secreto. Como obtê-lo? A única dica é o contador...",
+    "description": "**Desafio Secreto:** Elimine 10 Atiradores Pesados usando armas corpo a corpo.",
     "amount": "10",
     "filename": "challenge_mark_secret_02.png",
     "url": "/media/desafios/marcas/challenge_mark_secret_02.png",
@@ -8795,7 +8795,7 @@ window.warbannerMetadata = {
   "challenge_mark_secret_03.png": {
     "category": "marcas",
     "name": "Esmagador de Cabeças",
-    "description": "Desafio secreto. Como obtê-lo? A única dica é o contador...",
+    "description": "**Desafio Secreto:** Realize 100 tiros na cabeca enquanto desliza no PvP.",
     "amount": "100",
     "filename": "challenge_mark_secret_03.png",
     "url": "/media/desafios/marcas/challenge_mark_secret_03.png",
@@ -8804,7 +8804,7 @@ window.warbannerMetadata = {
   "challenge_mark_secret_04.png": {
     "category": "marcas",
     "name": "Último salto",
-    "description": "Desafio secreto: o contador é a única pista.",
+    "description": "**Desafio Secreto:** Elimine 1.000 inimigos enquanto eles estiverem pulando.",
     "amount": "1000",
     "filename": "challenge_mark_secret_04.png",
     "url": "/media/desafios/marcas/challenge_mark_secret_04.png",
@@ -8813,7 +8813,7 @@ window.warbannerMetadata = {
   "challenge_mark_secret_05.png": {
     "category": "marcas",
     "name": "Raticida",
-    "description": "Desafio secreto: o contador é a única pista.",
+    "description": "**Desafio Secreto:** Elimine 1.000 inimigos enquanto estiverem deitados (prone).",
     "amount": "1000",
     "filename": "challenge_mark_secret_05.png",
     "url": "/media/desafios/marcas/challenge_mark_secret_05.png",
