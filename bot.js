@@ -1140,39 +1140,25 @@ function buildGroupedTypePayloads(query, results, options = {}) {
     return [payload];
   }
 
-  const makeEmbed = (type, title, items) => {
-    const lines = items.length === 0
-      ? ['Nenhum desafio neste grupo.']
-      : items.map((item) => {
-          const imageUrl = getDisplayImageUrl(item);
-          const imageLine = imageUrl ? `\nImagem: ${imageUrl}` : '';
-          return `- **${item.name}**\n${item.description || 'Sem descricao.'}${imageLine}`;
-        });
-
-    return {
-      title,
-      description: lines.join('\n\n').slice(0, 4096),
-      color: getEmbedColor(type),
+  const chunks = chunkArray(orderedItems, MAX_EMBEDS_PER_MESSAGE);
+  return chunks.map((chunk, index) => {
+    const payload = {
+      content: index === 0
+        ? [
+            `[BUSCA] Resultados para "${query}": ${results.length} desafio(s).`,
+            summaryLine,
+            ...contentLines,
+          ].filter(Boolean).join('\n')
+        : `[BUSCA] Mais resultados para "${query}".`,
+      embeds: chunk.map((item) => buildChallengeEmbed(item, getDisplayImageUrl(item))),
     };
-  };
 
-  const payload = {
-    content: [
-      `[BUSCA] Resultados para "${query}": ${results.length} desafio(s).`,
-      ...contentLines,
-    ].filter(Boolean).join('\n'),
-    embeds: [
-      makeEmbed('marca', 'Marcas', grouped.marca),
-      makeEmbed('fita', 'Fitas', grouped.fita),
-      makeEmbed('insignia', 'Insignias', grouped.insignia),
-    ],
-  };
+    if (index === 0 && components) {
+      payload.components = components;
+    }
 
-  if (components) {
-    payload.components = components;
-  }
-
-  return [payload];
+    return payload;
+  });
 }
 
 function extractFilenameFromValue(value) {
