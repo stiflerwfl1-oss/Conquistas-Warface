@@ -36,7 +36,7 @@ let lastDataSource = 'none';
 const warbannerMetadata = loadMetadataMap();
 const imageReachabilityCache = new Map();
 
-const GENERIC_SEARCH_TERMS = new Set([
+const GENERIC_IGNORE_TERMS = new Set([
   'fita',
   'fitas',
   'stripe',
@@ -49,9 +49,47 @@ const GENERIC_SEARCH_TERMS = new Set([
   'desafios',
 ]);
 
-const GOLD_INTENT_TERMS = ['gold', 'golden', 'dourado', 'dourada', 'ouro'];
+const GOLD_TERMS = ['gold', 'golden', 'dourado', 'dourada', 'ouro'];
 
-const OPERATION_HINT_TERMS = [
+const VARIANT_IGNORE_TERMS = new Set([
+  ...GOLD_TERMS,
+  'coroa',
+  'crown',
+  'elite',
+  'mechanical',
+  'natal',
+  'piranha',
+  'imperador',
+  'amarelo',
+  'onda',
+  'jade',
+  'custom',
+  'personalizada',
+  'personalizado',
+]);
+
+const VARIANT_ALIASES = [
+  { id: 'imperador amarelo', aliases: ['imperador amarelo'] },
+  { id: 'onda jade', aliases: ['onda jade'] },
+  { id: 'elite coroa', aliases: ['elite coroa'] },
+  { id: 'black shark', aliases: ['black shark'] },
+  { id: 'hidden war', aliases: ['hidden war'] },
+  { id: 'mechanical', aliases: ['mechanical'] },
+  { id: 'coroa', aliases: ['coroa', 'crown'] },
+  { id: 'elite', aliases: ['elite'] },
+  { id: 'natal', aliases: ['natal', 'winter', 'inverno'] },
+  { id: 'piranha', aliases: ['piranha'] },
+  { id: 'custom', aliases: ['custom', 'personalizada', 'personalizado'] },
+  { id: 'atlas', aliases: ['atlas'] },
+  { id: 'yakuza', aliases: ['yakuza'] },
+  { id: 'pharaoh', aliases: ['pharaoh'] },
+  { id: 'hydra', aliases: ['hydra'] },
+  { id: 'anubis', aliases: ['anubis'] },
+  { id: 'winter', aliases: ['winter', 'inverno'] },
+  { id: 'gold', aliases: GOLD_TERMS },
+];
+
+const OPERATION_TERMS = [
   'chernobyl',
   'pripyat',
   'anubis',
@@ -62,33 +100,9 @@ const OPERATION_HINT_TERMS = [
   'pico gelado',
   'blackwood',
   'sunrise',
-  'marte',
   'mars',
+  'marte',
 ];
-
-const VARIANT_DEFINITIONS = [
-  { key: 'elite_coroa', label: 'Elite Coroa', query: 'elite coroa', terms: ['elite coroa'] },
-  { key: 'imperador_amarelo', label: 'Imperador Amarelo', query: 'imperador amarelo', terms: ['imperador amarelo'] },
-  { key: 'onda_jade', label: 'Onda Jade', query: 'onda jade', terms: ['onda jade'] },
-  { key: 'hidden_war', label: 'Hidden War', query: 'hidden war', terms: ['hidden war'] },
-  { key: 'black_shark', label: 'Black Shark', query: 'black shark', terms: ['black shark'] },
-  { key: 'mechanical', label: 'Mechanical', query: 'mechanical', terms: ['mechanical'] },
-  { key: 'coroa', label: 'Coroa', query: 'coroa', terms: ['coroa', 'crown'] },
-  { key: 'elite', label: 'Elite', query: 'elite', terms: ['elite'] },
-  { key: 'natal', label: 'de Natal', query: 'natal', terms: ['natal', 'winter', 'inverno'] },
-  { key: 'piranha', label: 'Piranha', query: 'piranha', terms: ['piranha'] },
-  { key: 'custom', label: 'Custom', query: 'custom', terms: ['custom', 'personalizada', 'personalizado'] },
-  { key: 'atlas', label: 'Atlas', query: 'atlas', terms: ['atlas'] },
-  { key: 'yakuza', label: 'Yakuza', query: 'yakuza', terms: ['yakuza'] },
-  { key: 'pharaoh', label: 'Pharaoh', query: 'pharaoh', terms: ['pharaoh'] },
-  { key: 'hydra', label: 'Hydra', query: 'hydra', terms: ['hydra'] },
-  { key: 'anubis', label: 'Anubis', query: 'anubis', terms: ['anubis'] },
-  { key: 'gold', label: 'dourado', query: 'dourado', terms: GOLD_INTENT_TERMS },
-];
-
-const ALL_VARIANT_TERMS = Array.from(
-  new Set(VARIANT_DEFINITIONS.flatMap((definition) => definition.terms.map((term) => normalizeText(term))))
-).sort((left, right) => right.length - left.length);
 
 function loadEnvFile() {
   if (!fs.existsSync(ENV_FILE)) return;
@@ -233,20 +247,44 @@ function hasAnyWholePhrase(text, phrases) {
   return (phrases || []).some((phrase) => hasWholePhrase(text, phrase));
 }
 
+function getCanonicalItemType(item) {
+  const rawType = typeof item === 'object' && item !== null ? item.type : item;
+  if (typeof filterCore.getCanonicalType === 'function') {
+    return filterCore.getCanonicalType(rawType || '');
+  }
+  return normalizeText(rawType || '');
+}
+
 function isFitaItem(item) {
-  return filterCore.getCanonicalType(item?.type) === 'fita';
+  return getCanonicalItemType(item) === 'fita';
 }
 
 function isInsigniaItem(item) {
-  return filterCore.getCanonicalType(item?.type) === 'insignia';
+  return getCanonicalItemType(item) === 'insignia';
 }
 
 function isMarcaItem(item) {
-  return filterCore.getCanonicalType(item?.type) === 'marca';
+  return getCanonicalItemType(item) === 'marca';
 }
 
-function isGoldIntent(query) {
-  return hasAnyWholePhrase(query, GOLD_INTENT_TERMS);
+function itemText(item) {
+  const tagsText = Array.isArray(item?.tags) ? item.tags.join(' ') : String(item?.tags || '');
+  return normalizeText(
+    [
+      item?.name,
+      item?.description,
+      tagsText,
+      item?.weapon,
+      item?.amount,
+      item?.objective,
+      item?.operationRaw,
+      item?.mode,
+      item?.mapRaw,
+      item?.map,
+    ]
+      .filter(Boolean)
+      .join(' ')
+  );
 }
 
 function getCanonicalOperationName(query) {
@@ -254,76 +292,178 @@ function getCanonicalOperationName(query) {
   return filterCore.resolveSpecOpsOperationName(query) || null;
 }
 
-function detectOperationIntent(query) {
-  return hasAnyWholePhrase(query, OPERATION_HINT_TERMS);
-}
-
-function getCombinedItemText(item) {
-  return normalizeText(
-    [
-      item?.name,
-      item?.description,
-      item?.operationRaw,
-      item?.mode,
-      item?.mapRaw,
-      item?.map,
-      Array.isArray(item?.tags) ? item.tags.join(' ') : '',
-    ]
-      .filter(Boolean)
-      .join(' ')
-  );
-}
-
-function getQueryCoreText(query) {
-  let core = ` ${normalizeText(query)} `;
-  for (const term of ALL_VARIANT_TERMS) {
-    const pattern = new RegExp(`(?:^|\\s)${escapeRegExp(term).replace(/\s+/g, '\\s+')}(?=$|\\s)`, 'g');
-    core = core.replace(pattern, ' ');
+function getQueryWithoutIgnoredTerms(query) {
+  let text = ` ${normalizeText(query)} `;
+  for (const variant of VARIANT_ALIASES) {
+    for (const alias of variant.aliases) {
+      const pattern = new RegExp(
+        `(?:^|\\s)${escapeRegExp(normalizeText(alias)).replace(/\s+/g, '\\s+')}(?=$|\\s)`,
+        'g'
+      );
+      text = text.replace(pattern, ' ');
+    }
   }
-  core = core
-    .split(/\s+/)
-    .filter((term) => term && !GENERIC_SEARCH_TERMS.has(term))
-    .join(' ')
-    .trim();
-  return core;
+
+  const words = splitNormalizedTerms(text).filter(
+    (term) => !GENERIC_IGNORE_TERMS.has(term) && !VARIANT_IGNORE_TERMS.has(term)
+  );
+  return words.join(' ').trim();
 }
 
-function getQueryCoreTerms(query) {
-  return splitNormalizedTerms(getQueryCoreText(query));
+function isWeaponLikeQuery(query) {
+  const core = getQueryWithoutIgnoredTerms(query);
+  if (!core) return false;
+  if (/\d/.test(core)) return true;
+
+  const terms = splitNormalizedTerms(core);
+  if (terms.length < 2 || terms.length > 4) return false;
+  const hasShortToken = terms.some((term) => term.length <= 3);
+  const looksOperation = hasAnyWholePhrase(core, OPERATION_TERMS) || Boolean(getCanonicalOperationName(core));
+  return hasShortToken && !looksOperation;
 }
 
-function itemMatchesAllTerms(item, terms) {
-  if (!Array.isArray(terms) || terms.length === 0) return true;
-  const text = getCombinedItemText(item);
-  return terms.every((term) => text.includes(term));
+function detectWantedVariants(normalizedQuery) {
+  const wanted = [];
+  for (const variant of VARIANT_ALIASES) {
+    if (variant.aliases.some((alias) => hasWholePhrase(normalizedQuery, alias))) {
+      wanted.push(variant.id);
+    }
+  }
+  return [...new Set(wanted)];
 }
 
-function detectVariantDefinitionFromItem(item) {
-  const text = getCombinedItemText(item);
-  return VARIANT_DEFINITIONS.find((definition) => hasAnyWholePhrase(text, definition.terms)) || null;
+function parseSmartQuery(query) {
+  const normalized = normalizeText(query);
+  const wantedVariants = detectWantedVariants(normalized);
+  const wantsGold = wantedVariants.includes('gold');
+  const core = getQueryWithoutIgnoredTerms(query);
+  const weaponTerm = core || normalized;
+  const isOperationQuery = hasAnyWholePhrase(normalized, OPERATION_TERMS) || Boolean(getCanonicalOperationName(query));
+  const isWeaponQuery = !isOperationQuery && isWeaponLikeQuery(query);
+  const isGenericWeaponSearch =
+    isWeaponQuery && !wantsGold && wantedVariants.filter((variant) => variant !== 'gold').length === 0;
+
+  return {
+    normalized,
+    weaponTerm,
+    isWeaponQuery,
+    wantsGold,
+    wantedVariants,
+    isGenericWeaponSearch,
+  };
 }
 
-function isGoldVariantItem(item) {
-  const definition = detectVariantDefinitionFromItem(item);
-  return definition?.key === 'gold';
+function isGoldItem(item) {
+  const text = itemText(item);
+  if (item?.isGold) return true;
+  if (hasAnyWholePhrase(text, GOLD_TERMS)) return true;
+  if (typeof filterCore.is999EliminationsChallenge === 'function'
+      && filterCore.is999EliminationsChallenge(item)) {
+    return hasAnyWholePhrase(text, GOLD_TERMS) || Boolean(item?.isGold);
+  }
+  return false;
 }
 
-function isBaseWeaponMatch(item, baseTerms) {
-  if (!isFitaItem(item)) return false;
-  if (!itemMatchesAllTerms(item, baseTerms)) return false;
-  return detectVariantDefinitionFromItem(item) === null;
+function isVariantItem(item, options = {}) {
+  const { countGoldAsVariant = true } = options;
+  const text = itemText(item);
+  const hasNonGoldVariant = VARIANT_ALIASES
+    .filter((variant) => variant.id !== 'gold')
+    .some((variant) => variant.aliases.some((alias) => hasWholePhrase(text, alias)));
+
+  if (hasNonGoldVariant) return true;
+  if (countGoldAsVariant && isGoldItem(item)) return true;
+  return false;
+}
+
+function buildWeaponRegexPatterns(weaponTerm) {
+  const normalized = normalizeText(weaponTerm);
+  if (!normalized) return [];
+  const patterns = new Set();
+  patterns.add(escapeRegExp(normalized).replace(/\s+/g, '\\s+'));
+
+  const compact = normalized.replace(/\s+/g, '');
+  const compactSegments = compact.match(/[a-z]+|\d+/g);
+  if (compactSegments && compactSegments.length > 0) {
+    patterns.add(compactSegments.map((part) => escapeRegExp(part)).join('\\s*'));
+  }
+
+  return [...patterns];
+}
+
+function itemMentionsWeapon(item, weaponTerm) {
+  const normalizedWeapon = normalizeText(weaponTerm);
+  if (!normalizedWeapon) return false;
+
+  const text = normalizeText([item?.name, item?.description].filter(Boolean).join(' '));
+  if (!text) return false;
+
+  const patterns = buildWeaponRegexPatterns(normalizedWeapon);
+  return patterns.some((pattern) => new RegExp(`(?:^|\\s)${pattern}(?=$|\\s)`).test(text));
+}
+
+function hasVariantId(item, variantId) {
+  if (variantId === 'gold') return isGoldItem(item);
+  const variant = VARIANT_ALIASES.find((entry) => entry.id === variantId);
+  if (!variant) return false;
+  const text = itemText(item);
+  return variant.aliases.some((alias) => hasWholePhrase(text, alias));
 }
 
 function isAdvancedWeaponRibbon(item) {
-  const normalizedDescription = normalizeText(item?.description || '');
-  return /\b10000\b|\b10 000\b|avancad/.test(normalizedDescription);
+  const description = normalizeText(item?.description || '');
+  return /\b10000\b|\b10\s*000\b|avancad/.test(description);
 }
 
-function getVariantIntentsFromQuery(query) {
-  const normalizedQuery = normalizeText(query);
-  return VARIANT_DEFINITIONS.filter(
-    (definition) => definition.key !== 'gold' && hasAnyWholePhrase(normalizedQuery, definition.terms)
+function scoreWeaponResult(item, parsedQuery) {
+  if (!itemMentionsWeapon(item, parsedQuery.weaponTerm)) return -9999;
+
+  const type = getCanonicalItemType(item);
+  const gold = isGoldItem(item);
+  const variantNoGold = isVariantItem(item, { countGoldAsVariant: false });
+  const wantedVariants = parsedQuery.wantedVariants.filter((variant) => variant !== 'gold');
+  const matchedWantedVariants = wantedVariants.every((variantId) => hasVariantId(item, variantId));
+  const nameText = normalizeText(item?.name || '');
+  const descriptionText = normalizeText(item?.description || '');
+  const weaponPatterns = buildWeaponRegexPatterns(parsedQuery.weaponTerm);
+  const mentionsInName = weaponPatterns.some((pattern) => new RegExp(`(?:^|\\s)${pattern}(?=$|\\s)`).test(nameText));
+  const mentionsInDescription = weaponPatterns.some((pattern) =>
+    new RegExp(`(?:^|\\s)${pattern}(?=$|\\s)`).test(descriptionText)
   );
+
+  let score = 0;
+
+  if (type === 'fita') score += 1000;
+  else if (type === 'insignia') score += 300;
+  else if (type === 'marca') score += 100;
+
+  if (parsedQuery.isGenericWeaponSearch) {
+    const baseNormalFita = type === 'fita' && !gold && !variantNoGold;
+    if (baseNormalFita) {
+      score += isAdvancedWeaponRibbon(item) ? 900 : 1000;
+    }
+    if (gold) score -= 600;
+    if (variantNoGold) score -= 500;
+    if (type === 'marca') score -= 200;
+  }
+
+  if (parsedQuery.wantsGold) {
+    if (gold) score += 1500;
+    else score -= 800;
+    if (variantNoGold) score -= 500;
+  }
+
+  if (wantedVariants.length > 0) {
+    if (matchedWantedVariants) score += 1500;
+    else score -= 800;
+    if (gold && !parsedQuery.wantsGold) score -= 600;
+  }
+
+  if (/\belimine\b/.test(descriptionText) && mentionsInDescription) score += 300;
+  if (mentionsInName) score += 100;
+  if (mentionsInDescription) score += 300;
+
+  return score;
 }
 
 function formatDisplayQuery(value) {
@@ -337,24 +477,60 @@ function formatDisplayQuery(value) {
     .join(' ');
 }
 
-function buildVariantOption(baseQuery, baseTerms, item) {
-  const variant = detectVariantDefinitionFromItem(item);
-  if (!variant || variant.key === 'gold' && baseTerms.length === 0) return null;
-  if (!itemMatchesAllTerms(item, baseTerms)) return null;
-
-  const baseCore = getQueryCoreText(baseQuery) || normalizeText(baseQuery);
-  if (!baseCore) return null;
-
-  const baseLabel = formatDisplayQuery(baseCore);
-  let label = `${baseLabel} ${variant.label}`;
-  if (variant.key === 'onda_jade') {
-    label = `Onda Jade: ${baseLabel}`;
+function getPrimaryVariantIdForItem(item) {
+  if (isGoldItem(item)) return 'gold';
+  const text = itemText(item);
+  for (const variant of VARIANT_ALIASES.filter((entry) => entry.id !== 'gold')) {
+    if (variant.aliases.some((alias) => hasWholePhrase(text, alias))) {
+      return variant.id;
+    }
   }
+  return null;
+}
+
+function getVariantDisplayParts(variantId) {
+  const map = {
+    gold: { labelSuffix: 'dourado', query: 'dourado' },
+    'imperador amarelo': { labelSuffix: 'Imperador Amarelo', query: 'imperador amarelo' },
+    'onda jade': { labelPrefix: 'Onda Jade', query: 'onda jade' },
+    'elite coroa': { labelSuffix: 'Elite Coroa', query: 'elite coroa' },
+    'black shark': { labelSuffix: 'Black Shark', query: 'black shark' },
+    'hidden war': { labelSuffix: 'Hidden War', query: 'hidden war' },
+    mechanical: { labelSuffix: 'Mechanical', query: 'mechanical' },
+    coroa: { labelSuffix: 'Coroa', query: 'coroa' },
+    elite: { labelSuffix: 'Elite', query: 'elite' },
+    natal: { labelSuffix: 'de Natal', query: 'natal' },
+    piranha: { labelSuffix: 'Piranha', query: 'piranha' },
+    custom: { labelSuffix: 'Custom', query: 'custom' },
+    atlas: { labelSuffix: 'Atlas', query: 'atlas' },
+    yakuza: { labelSuffix: 'Yakuza', query: 'yakuza' },
+    pharaoh: { labelSuffix: 'Pharaoh', query: 'pharaoh' },
+    hydra: { labelSuffix: 'Hydra', query: 'hydra' },
+    anubis: { labelSuffix: 'Anubis', query: 'anubis' },
+    winter: { labelSuffix: 'de Inverno', query: 'inverno' },
+  };
+  return map[variantId] || null;
+}
+
+function buildVariantOption(baseQuery, item) {
+  const variantId = getPrimaryVariantIdForItem(item);
+  if (!variantId) return null;
+
+  const parsedBase = parseSmartQuery(baseQuery);
+  const baseTerm = parsedBase.weaponTerm || normalizeText(baseQuery);
+  if (!baseTerm) return null;
+
+  const parts = getVariantDisplayParts(variantId);
+  if (!parts) return null;
+
+  const baseLabel = formatDisplayQuery(baseTerm);
+  const label = parts.labelPrefix ? `${parts.labelPrefix}: ${baseLabel}` : `${baseLabel} ${parts.labelSuffix}`;
+  const query = parts.labelPrefix ? `${parts.query} ${baseTerm}` : `${baseTerm} ${parts.query}`;
 
   return {
     label: label.trim(),
     description: String(item?.description || item?.name || 'Versão alternativa').trim(),
-    query: `${baseCore} ${variant.query}`.trim(),
+    query: normalizeText(query),
   };
 }
 
@@ -387,14 +563,11 @@ function buildVariantSelectMenu(baseQuery, variants) {
   return new ActionRowBuilder().addComponents(select);
 }
 
-function buildSmartSearchGroups(query, results) {
-  const indexed = (Array.isArray(results) ? results : []).map((item, index) => ({ item, index }));
-  const normalizedQuery = normalizeText(query);
+function buildSmartSearchGroupsLegacyUnused(query, rawResults) {
+  const indexed = (Array.isArray(rawResults) ? rawResults : []).map((item, index) => ({ item, index }));
+  const parsedQuery = parseSmartQuery(query);
   const operationName = getCanonicalOperationName(query);
-  const operationMode = Boolean(operationName) || detectOperationIntent(normalizedQuery);
-  const goldIntent = isGoldIntent(query);
-  const variantIntents = getVariantIntentsFromQuery(query);
-  const baseTerms = getQueryCoreTerms(query);
+  const isOperationQuery = Boolean(operationName) || hasAnyWholePhrase(parsedQuery.normalized, OPERATION_TERMS);
 
   if (operationMode) {
     const fitas = indexed.filter((entry) => isFitaItem(entry.item));
@@ -504,6 +677,134 @@ function buildSmartSearchGroups(query, results) {
 
 function isAllowedChannel(channelId) {
   return String(channelId || '') === ALLOWED_CHANNEL_ID;
+}
+
+function buildSmartSearchGroups(query, rawResults) {
+  const indexed = (Array.isArray(rawResults) ? rawResults : []).map((item, index) => ({ item, index }));
+  const parsedQuery = parseSmartQuery(query);
+  const operationName = getCanonicalOperationName(query);
+  const isOperationQuery = Boolean(operationName) || hasAnyWholePhrase(parsedQuery.normalized, OPERATION_TERMS);
+
+  const sortByTypeThenIndex = (entries) => {
+    const typeRank = (item) => {
+      const type = getCanonicalItemType(item);
+      if (type === 'fita') return 0;
+      if (type === 'insignia') return 1;
+      if (type === 'marca') return 2;
+      return 3;
+    };
+
+    return [...entries].sort((left, right) => {
+      const rankDiff = typeRank(left.item) - typeRank(right.item);
+      if (rankDiff !== 0) return rankDiff;
+      return left.index - right.index;
+    });
+  };
+
+  if (parsedQuery.isWeaponQuery) {
+    const scored = indexed
+      .map((entry) => ({
+        ...entry,
+        score: scoreWeaponResult(entry.item, parsedQuery),
+      }))
+      .sort((left, right) => {
+        if (right.score !== left.score) return right.score - left.score;
+        return left.index - right.index;
+      });
+
+    const wantedNonGold = parsedQuery.wantedVariants.filter((variant) => variant !== 'gold');
+    const primary = [];
+    const related = [];
+    const variantCandidates = [];
+
+    for (const entry of scored) {
+      const item = entry.item;
+      const type = getCanonicalItemType(item);
+      const mentionsWeapon = itemMentionsWeapon(item, parsedQuery.weaponTerm);
+      if (!mentionsWeapon) continue;
+
+      const gold = isGoldItem(item);
+      const variantNoGold = isVariantItem(item, { countGoldAsVariant: false });
+      const matchesWantedVariant = wantedNonGold.length > 0
+        ? wantedNonGold.every((variant) => hasVariantId(item, variant))
+        : false;
+      const baseNormal = !gold && !variantNoGold;
+      const isFita = type === 'fita';
+
+      if (isFita) {
+        if (parsedQuery.isGenericWeaponSearch && baseNormal) {
+          primary.push(item);
+          continue;
+        }
+        if (parsedQuery.wantsGold && gold) {
+          primary.push(item);
+          continue;
+        }
+        if (wantedNonGold.length > 0 && matchesWantedVariant) {
+          primary.push(item);
+          continue;
+        }
+      }
+
+      related.push(item);
+      if (isFita && (gold || variantNoGold)) {
+        variantCandidates.push(item);
+      }
+    }
+
+    if (primary.length === 0) {
+      const fallbackFitas = scored
+        .filter((entry) => getCanonicalItemType(entry.item) === 'fita' && itemMentionsWeapon(entry.item, parsedQuery.weaponTerm))
+        .map((entry) => entry.item);
+      primary.push(...fallbackFitas);
+    }
+
+    const primarySet = new Set(primary);
+    const cleanRelated = [];
+    for (const item of related) {
+      if (!primarySet.has(item)) cleanRelated.push(item);
+    }
+
+    const variants = uniqueByQuery(
+      variantCandidates
+        .filter((item) => !primarySet.has(item))
+        .map((item) => buildVariantOption(parsedQuery.weaponTerm, item))
+        .filter(Boolean)
+    );
+
+    return {
+      mode: 'weapon',
+      title: `🎖️ Fitas principais encontradas para: ${formatDisplayQuery(parsedQuery.weaponTerm)}`,
+      primary,
+      related: cleanRelated,
+      variants,
+      parsedQuery,
+    };
+  }
+
+  if (isOperationQuery) {
+    const ordered = sortByTypeThenIndex(indexed).map((entry) => entry.item);
+    const operationTitle = hasAnyWholePhrase(parsedQuery.normalized, ['chernobyl', 'pripyat'])
+      ? 'Chernobyl / Pripyat'
+      : formatDisplayQuery(operationName || query);
+    return {
+      mode: 'operation',
+      title: `🎖️ Resultados encontrados para: ${operationTitle}`,
+      primary: ordered,
+      related: [],
+      variants: [],
+      parsedQuery,
+    };
+  }
+
+  return {
+    mode: 'generic',
+    title: `[BUSCA] Resultados para "${query}": ${indexed.length} desafio(s).`,
+    primary: sortByTypeThenIndex(indexed).map((entry) => entry.item),
+    related: [],
+    variants: [],
+    parsedQuery,
+  };
 }
 
 function parseAchievementsFromSource(sourceCode, sourceName) {
@@ -665,6 +966,48 @@ function buildSearchPayloads(query, smartGroups, resolvedResults, options = {}) 
   });
 }
 
+function buildSmartSearchPayloads(query, smartGroups, resolvedResults) {
+  const parsed = smartGroups?.parsedQuery || parseSmartQuery(query);
+  const variantMenu =
+    smartGroups?.mode === 'weapon' && parsed.isGenericWeaponSearch
+      ? buildVariantSelectMenu(parsed.weaponTerm || query, smartGroups.variants || [])
+      : null;
+  const chunks = chunkArray(resolvedResults || [], MAX_EMBEDS_PER_MESSAGE);
+
+  return chunks.map((chunk, chunkIndex) => {
+    const lines = [];
+    if (chunkIndex === 0) {
+      if (smartGroups?.mode === 'weapon') {
+        lines.push(smartGroups.title || `🎖️ Fitas principais encontradas para: ${formatDisplayQuery(parsed.weaponTerm || query)}`);
+        if (Array.isArray(smartGroups.related) && smartGroups.related.length > 0) {
+          lines.push('📌 Também encontrei resultados relacionados abaixo.');
+        }
+        if (variantMenu) {
+          lines.push('🔽 Quer ver outras versões? Escolha abaixo:');
+        }
+      } else if (smartGroups?.mode === 'operation') {
+        lines.push(smartGroups.title || `🎖️ Resultados encontrados para: ${formatDisplayQuery(query)}`);
+        lines.push('Ordenado por: Fitas → Insígnias → Marcas');
+      } else {
+        lines.push(smartGroups.title || `[BUSCA] Resultados para "${query}": ${resolvedResults.length} desafio(s).`);
+      }
+    } else {
+      lines.push(`Continuação de "${formatDisplayQuery(query)}".`);
+    }
+
+    const payload = {
+      content: lines.join('\n'),
+      embeds: chunk.map(({ item, imageUrl }) => buildChallengeEmbed(item, imageUrl)),
+    };
+
+    if (chunkIndex === 0 && variantMenu) {
+      payload.components = [variantMenu];
+    }
+
+    return payload;
+  });
+}
+
 function extractFilenameFromValue(value) {
   if (!value) return '';
   const normalized = String(value).split('?')[0].trim();
@@ -806,33 +1149,23 @@ async function resolveChallengeImage(item) {
 }
 
 async function buildSearchResponses(query) {
+  const parsed = parseSmartQuery(query);
   let results = searchChallenges(query);
-  if (results.length === 0 && isGoldIntent(query)) {
-    const baseCore = getQueryCoreText(query);
-    if (baseCore) {
-      const goldFallbackQuery = `${baseCore} dourado`.trim();
-      if (normalizeText(goldFallbackQuery) !== normalizeText(query)) {
-        results = searchChallenges(goldFallbackQuery);
-      }
-    }
+  if (results.length === 0 && parsed.wantsGold && parsed.weaponTerm) {
+    results = searchChallenges(`${parsed.weaponTerm} dourado`);
   }
   if (results.length === 0) return [];
+
   const smartGroups = buildSmartSearchGroups(query, results);
-  const orderedResults = [...smartGroups.primary, ...smartGroups.related];
-  const limitedResults = orderedResults.slice(0, MAX_RESULTS_PER_SEARCH);
+  const finalResults = [...smartGroups.primary, ...smartGroups.related].slice(0, MAX_RESULTS_PER_SEARCH);
   const resolvedResults = [];
-  for (const item of limitedResults) {
+
+  for (const item of finalResults) {
     const imageUrl = await resolveChallengeImage(item);
     resolvedResults.push({ item, imageUrl });
   }
-  const variantMenu =
-    smartGroups.mode === 'weapon' && !isGoldIntent(query) && getVariantIntentsFromQuery(query).length === 0
-      ? buildVariantSelectMenu(query, smartGroups.variants)
-      : null;
-  return buildSearchPayloads(query, smartGroups, resolvedResults, {
-    totalCount: orderedResults.length,
-    variantMenu,
-  });
+
+  return buildSmartSearchPayloads(query, smartGroups, resolvedResults);
 }
 
 function searchChallenges(query) {
@@ -1055,11 +1388,20 @@ if (require.main === module) {
 } else {
   module.exports = {
     buildSmartSearchGroups,
+    buildSmartSearchPayloads,
     buildVariantSelectMenu,
     buildSearchResponses,
+    getCanonicalItemType,
     getChallengeImageCandidates,
+    isGoldItem,
+    isVariantItem,
+    isWeaponLikeQuery,
+    itemMentionsWeapon,
+    itemText,
+    parseSmartQuery,
     readLocalData,
     resolveChallengeImage,
+    scoreWeaponResult,
     searchChallenges,
     startBot: main,
     setAchievementsDataForTest(data) {
