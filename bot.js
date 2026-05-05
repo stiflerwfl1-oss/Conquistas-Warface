@@ -3,7 +3,14 @@ const http = require('http');
 const path = require('path');
 const vm = require('vm');
 const https = require('https');
-const { Client, Events, GatewayIntentBits, SlashCommandBuilder } = require('discord.js');
+const {
+  Client,
+  Events,
+  GatewayIntentBits,
+  SlashCommandBuilder,
+  ActionRowBuilder,
+  StringSelectMenuBuilder,
+} = require('discord.js');
 const filterCore = require('./warbanner-filter-core');
 
 const DATA_FILE = path.join(__dirname, 'data.js');
@@ -28,6 +35,60 @@ let catalogData = [];
 let lastDataSource = 'none';
 const warbannerMetadata = loadMetadataMap();
 const imageReachabilityCache = new Map();
+
+const GENERIC_SEARCH_TERMS = new Set([
+  'fita',
+  'fitas',
+  'stripe',
+  'stripes',
+  'conquista',
+  'conquistas',
+  'arma',
+  'armas',
+  'desafio',
+  'desafios',
+]);
+
+const GOLD_INTENT_TERMS = ['gold', 'golden', 'dourado', 'dourada', 'ouro'];
+
+const OPERATION_HINT_TERMS = [
+  'chernobyl',
+  'pripyat',
+  'anubis',
+  'black shark',
+  'hydra',
+  'icebreaker',
+  'quebra gelo',
+  'pico gelado',
+  'blackwood',
+  'sunrise',
+  'marte',
+  'mars',
+];
+
+const VARIANT_DEFINITIONS = [
+  { key: 'elite_coroa', label: 'Elite Coroa', query: 'elite coroa', terms: ['elite coroa'] },
+  { key: 'imperador_amarelo', label: 'Imperador Amarelo', query: 'imperador amarelo', terms: ['imperador amarelo'] },
+  { key: 'onda_jade', label: 'Onda Jade', query: 'onda jade', terms: ['onda jade'] },
+  { key: 'hidden_war', label: 'Hidden War', query: 'hidden war', terms: ['hidden war'] },
+  { key: 'black_shark', label: 'Black Shark', query: 'black shark', terms: ['black shark'] },
+  { key: 'mechanical', label: 'Mechanical', query: 'mechanical', terms: ['mechanical'] },
+  { key: 'coroa', label: 'Coroa', query: 'coroa', terms: ['coroa', 'crown'] },
+  { key: 'elite', label: 'Elite', query: 'elite', terms: ['elite'] },
+  { key: 'natal', label: 'de Natal', query: 'natal', terms: ['natal', 'winter', 'inverno'] },
+  { key: 'piranha', label: 'Piranha', query: 'piranha', terms: ['piranha'] },
+  { key: 'custom', label: 'Custom', query: 'custom', terms: ['custom', 'personalizada', 'personalizado'] },
+  { key: 'atlas', label: 'Atlas', query: 'atlas', terms: ['atlas'] },
+  { key: 'yakuza', label: 'Yakuza', query: 'yakuza', terms: ['yakuza'] },
+  { key: 'pharaoh', label: 'Pharaoh', query: 'pharaoh', terms: ['pharaoh'] },
+  { key: 'hydra', label: 'Hydra', query: 'hydra', terms: ['hydra'] },
+  { key: 'anubis', label: 'Anubis', query: 'anubis', terms: ['anubis'] },
+  { key: 'gold', label: 'dourado', query: 'dourado', terms: GOLD_INTENT_TERMS },
+];
+
+const ALL_VARIANT_TERMS = Array.from(
+  new Set(VARIANT_DEFINITIONS.flatMap((definition) => definition.terms.map((term) => normalizeText(term))))
+).sort((left, right) => right.length - left.length);
 
 function loadEnvFile() {
   if (!fs.existsSync(ENV_FILE)) return;
@@ -146,6 +207,299 @@ function normalizeSearchQuery(value) {
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function normalizeText(value) {
+  return normalizeSearchQuery(value);
+}
+
+function splitNormalizedTerms(value) {
+  return normalizeText(value).split(/\s+/).filter(Boolean);
+}
+
+function escapeRegExp(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function hasWholePhrase(text, phrase) {
+  const normalizedText = normalizeText(text);
+  const normalizedPhrase = normalizeText(phrase);
+  if (!normalizedText || !normalizedPhrase) return false;
+  const pattern = escapeRegExp(normalizedPhrase).replace(/\s+/g, '\\s+');
+  return new RegExp(`(?:^|\\s)${pattern}(?=$|\\s)`).test(normalizedText);
+}
+
+function hasAnyWholePhrase(text, phrases) {
+  return (phrases || []).some((phrase) => hasWholePhrase(text, phrase));
+}
+
+function isFitaItem(item) {
+  return filterCore.getCanonicalType(item?.type) === 'fita';
+}
+
+function isInsigniaItem(item) {
+  return filterCore.getCanonicalType(item?.type) === 'insignia';
+}
+
+function isMarcaItem(item) {
+  return filterCore.getCanonicalType(item?.type) === 'marca';
+}
+
+function isGoldIntent(query) {
+  return hasAnyWholePhrase(query, GOLD_INTENT_TERMS);
+}
+
+function getCanonicalOperationName(query) {
+  if (typeof filterCore.resolveSpecOpsOperationName !== 'function') return null;
+  return filterCore.resolveSpecOpsOperationName(query) || null;
+}
+
+function detectOperationIntent(query) {
+  return hasAnyWholePhrase(query, OPERATION_HINT_TERMS);
+}
+
+function getCombinedItemText(item) {
+  return normalizeText(
+    [
+      item?.name,
+      item?.description,
+      item?.operationRaw,
+      item?.mode,
+      item?.mapRaw,
+      item?.map,
+      Array.isArray(item?.tags) ? item.tags.join(' ') : '',
+    ]
+      .filter(Boolean)
+      .join(' ')
+  );
+}
+
+function getQueryCoreText(query) {
+  let core = ` ${normalizeText(query)} `;
+  for (const term of ALL_VARIANT_TERMS) {
+    const pattern = new RegExp(`(?:^|\\s)${escapeRegExp(term).replace(/\s+/g, '\\s+')}(?=$|\\s)`, 'g');
+    core = core.replace(pattern, ' ');
+  }
+  core = core
+    .split(/\s+/)
+    .filter((term) => term && !GENERIC_SEARCH_TERMS.has(term))
+    .join(' ')
+    .trim();
+  return core;
+}
+
+function getQueryCoreTerms(query) {
+  return splitNormalizedTerms(getQueryCoreText(query));
+}
+
+function itemMatchesAllTerms(item, terms) {
+  if (!Array.isArray(terms) || terms.length === 0) return true;
+  const text = getCombinedItemText(item);
+  return terms.every((term) => text.includes(term));
+}
+
+function detectVariantDefinitionFromItem(item) {
+  const text = getCombinedItemText(item);
+  return VARIANT_DEFINITIONS.find((definition) => hasAnyWholePhrase(text, definition.terms)) || null;
+}
+
+function isGoldVariantItem(item) {
+  const definition = detectVariantDefinitionFromItem(item);
+  return definition?.key === 'gold';
+}
+
+function isBaseWeaponMatch(item, baseTerms) {
+  if (!isFitaItem(item)) return false;
+  if (!itemMatchesAllTerms(item, baseTerms)) return false;
+  return detectVariantDefinitionFromItem(item) === null;
+}
+
+function isAdvancedWeaponRibbon(item) {
+  const normalizedDescription = normalizeText(item?.description || '');
+  return /\b10000\b|\b10 000\b|avancad/.test(normalizedDescription);
+}
+
+function getVariantIntentsFromQuery(query) {
+  const normalizedQuery = normalizeText(query);
+  return VARIANT_DEFINITIONS.filter(
+    (definition) => definition.key !== 'gold' && hasAnyWholePhrase(normalizedQuery, definition.terms)
+  );
+}
+
+function formatDisplayQuery(value) {
+  const terms = splitNormalizedTerms(value);
+  if (terms.length === 0) return String(value || '').trim();
+  return terms
+    .map((term) => {
+      if (/\d/.test(term) || term.length <= 4) return term.toUpperCase();
+      return term.charAt(0).toUpperCase() + term.slice(1);
+    })
+    .join(' ');
+}
+
+function buildVariantOption(baseQuery, baseTerms, item) {
+  const variant = detectVariantDefinitionFromItem(item);
+  if (!variant || variant.key === 'gold' && baseTerms.length === 0) return null;
+  if (!itemMatchesAllTerms(item, baseTerms)) return null;
+
+  const baseCore = getQueryCoreText(baseQuery) || normalizeText(baseQuery);
+  if (!baseCore) return null;
+
+  const baseLabel = formatDisplayQuery(baseCore);
+  let label = `${baseLabel} ${variant.label}`;
+  if (variant.key === 'onda_jade') {
+    label = `Onda Jade: ${baseLabel}`;
+  }
+
+  return {
+    label: label.trim(),
+    description: String(item?.description || item?.name || 'Versão alternativa').trim(),
+    query: `${baseCore} ${variant.query}`.trim(),
+  };
+}
+
+function uniqueByQuery(variants) {
+  const seen = new Set();
+  const unique = [];
+  for (const variant of variants || []) {
+    const key = normalizeText(variant?.query);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    unique.push(variant);
+  }
+  return unique;
+}
+
+function buildVariantSelectMenu(baseQuery, variants) {
+  if (!Array.isArray(variants) || variants.length === 0) return null;
+
+  const options = variants.slice(0, 25).map((variant) => ({
+    label: String(variant.label || '').slice(0, 100),
+    description: String(variant.description || 'Versão alternativa').slice(0, 100),
+    value: String(variant.query || '').slice(0, 100),
+  }));
+
+  const select = new StringSelectMenuBuilder()
+    .setCustomId(`variant_search:${normalizeSearchQuery(baseQuery).slice(0, 80)}`)
+    .setPlaceholder('Escolha uma variação da arma')
+    .addOptions(options);
+
+  return new ActionRowBuilder().addComponents(select);
+}
+
+function buildSmartSearchGroups(query, results) {
+  const indexed = (Array.isArray(results) ? results : []).map((item, index) => ({ item, index }));
+  const normalizedQuery = normalizeText(query);
+  const operationName = getCanonicalOperationName(query);
+  const operationMode = Boolean(operationName) || detectOperationIntent(normalizedQuery);
+  const goldIntent = isGoldIntent(query);
+  const variantIntents = getVariantIntentsFromQuery(query);
+  const baseTerms = getQueryCoreTerms(query);
+
+  if (operationMode) {
+    const fitas = indexed.filter((entry) => isFitaItem(entry.item));
+    const insignias = indexed.filter((entry) => isInsigniaItem(entry.item));
+    const marcas = indexed.filter((entry) => isMarcaItem(entry.item));
+    const others = indexed.filter(
+      (entry) => !isFitaItem(entry.item) && !isInsigniaItem(entry.item) && !isMarcaItem(entry.item)
+    );
+
+    return {
+      mode: 'operation',
+      title: `🎖️ Fitas encontradas para: ${
+        hasAnyWholePhrase(normalizedQuery, ['chernobyl', 'pripyat'])
+          ? 'Chernobyl / Pripyat'
+          : formatDisplayQuery(query)
+      }`,
+      subtitleLines: [
+        insignias.length ? `🛡️ Insígnias relacionadas: ${insignias.length}` : null,
+        marcas.length ? `🎯 Marcas relacionadas: ${marcas.length}` : null,
+      ].filter(Boolean),
+      primary: fitas.map((entry) => entry.item),
+      related: [...insignias, ...marcas, ...others].map((entry) => entry.item),
+      variants: [],
+      totalCount: indexed.length,
+    };
+  }
+
+  const hasBaseTerms = baseTerms.length > 0;
+  const weaponMode = hasBaseTerms
+    && (
+      baseTerms.some((term) => /\d/.test(term))
+      || goldIntent
+      || variantIntents.length > 0
+      || indexed.some((entry) => isFitaItem(entry.item) && itemMatchesAllTerms(entry.item, baseTerms))
+    );
+
+  if (weaponMode) {
+    const weaponFitas = indexed.filter(
+      (entry) => isFitaItem(entry.item) && itemMatchesAllTerms(entry.item, baseTerms)
+    );
+    let primaryEntries = [];
+
+    if (goldIntent) {
+      primaryEntries = weaponFitas.filter((entry) => isGoldVariantItem(entry.item));
+    } else if (variantIntents.length > 0) {
+      primaryEntries = weaponFitas.filter((entry) =>
+        variantIntents.some((definition) => hasAnyWholePhrase(getCombinedItemText(entry.item), definition.terms))
+      );
+    } else {
+      primaryEntries = weaponFitas.filter((entry) => isBaseWeaponMatch(entry.item, baseTerms));
+    }
+
+    if (primaryEntries.length === 0) {
+      primaryEntries = weaponFitas;
+    }
+
+    primaryEntries.sort((left, right) => {
+      const leftAdvanced = isAdvancedWeaponRibbon(left.item) ? 1 : 0;
+      const rightAdvanced = isAdvancedWeaponRibbon(right.item) ? 1 : 0;
+      if (leftAdvanced !== rightAdvanced) return leftAdvanced - rightAdvanced;
+      return left.index - right.index;
+    });
+
+    const primarySet = new Set(primaryEntries.map((entry) => entry.index));
+    const relatedEntries = indexed.filter((entry) => !primarySet.has(entry.index));
+    relatedEntries.sort((left, right) => {
+      const getRank = (item) => {
+        if (isFitaItem(item)) return 0;
+        if (isInsigniaItem(item)) return 1;
+        if (isMarcaItem(item)) return 2;
+        return 3;
+      };
+      const leftRank = getRank(left.item);
+      const rightRank = getRank(right.item);
+      if (leftRank !== rightRank) return leftRank - rightRank;
+      return left.index - right.index;
+    });
+
+    const variants = uniqueByQuery(
+      weaponFitas
+        .filter((entry) => !primarySet.has(entry.index))
+        .map((entry) => buildVariantOption(query, baseTerms, entry.item))
+        .filter(Boolean)
+    );
+
+    return {
+      mode: 'weapon',
+      title: `🎖️ Fitas principais encontradas para: ${formatDisplayQuery(getQueryCoreText(query) || query)}`,
+      subtitleLines: relatedEntries.length ? ['📌 Resultados relacionados:'] : [],
+      primary: primaryEntries.map((entry) => entry.item),
+      related: relatedEntries.map((entry) => entry.item),
+      variants,
+      totalCount: indexed.length,
+    };
+  }
+
+  return {
+    mode: 'generic',
+    title: `🎖️ Resultados encontrados para: ${formatDisplayQuery(query)}`,
+    subtitleLines: [],
+    primary: indexed.map((entry) => entry.item),
+    related: [],
+    variants: [],
+    totalCount: indexed.length,
+  };
 }
 
 function isAllowedChannel(channelId) {
@@ -269,10 +623,11 @@ function chunkArray(items, chunkSize) {
   return chunks;
 }
 
-function buildSearchPayloads(query, results, resolvedResults) {
+function buildSearchPayloads(query, smartGroups, resolvedResults, options = {}) {
+  const totalCount = Number.isFinite(options.totalCount) ? options.totalCount : smartGroups?.totalCount || 0;
+  const variantMenu = options.variantMenu || null;
   const chunks = chunkArray(resolvedResults, MAX_EMBEDS_PER_MESSAGE);
   const displayedCount = resolvedResults.length;
-  const totalCount = results.length;
 
   return chunks.map((chunk, chunkIndex) => {
     const start = chunkIndex * MAX_EMBEDS_PER_MESSAGE + 1;
@@ -284,13 +639,29 @@ function buildSearchPayloads(query, results, resolvedResults) {
         ? `\nExibindo ${displayedCount} de ${totalCount} resultados. Refine a busca para ver menos itens por vez.`
         : '';
 
-    return {
-      content:
-        chunkIndex === 0
-          ? `[BUSCA] Resultados para "${query}": ${totalCount} desafio(s).${chunkLabel}${trimmedLabel}`
-          : `[BUSCA] Continuação de "${query}".${chunkLabel}`,
+    const content =
+      chunkIndex === 0
+        ? [
+            smartGroups?.title || `🎖️ Resultados para: ${formatDisplayQuery(query)}`,
+            ...(smartGroups?.subtitleLines || []),
+            variantMenu ? '🔽 Quer ver outras versões? Escolha abaixo:' : null,
+            chunkLabel ? chunkLabel.trim() : null,
+            trimmedLabel ? trimmedLabel.trim() : null,
+          ]
+            .filter(Boolean)
+            .join('\n')
+        : `📄 Continuação de "${formatDisplayQuery(query)}".${chunkLabel}`;
+
+    const payload = {
+      content,
       embeds: chunk.map(({ item, imageUrl }) => buildChallengeEmbed(item, imageUrl)),
     };
+
+    if (chunkIndex === 0 && variantMenu) {
+      payload.components = [variantMenu];
+    }
+
+    return payload;
   });
 }
 
@@ -435,18 +806,33 @@ async function resolveChallengeImage(item) {
 }
 
 async function buildSearchResponses(query) {
-  const results = searchChallenges(query);
+  let results = searchChallenges(query);
+  if (results.length === 0 && isGoldIntent(query)) {
+    const baseCore = getQueryCoreText(query);
+    if (baseCore) {
+      const goldFallbackQuery = `${baseCore} dourado`.trim();
+      if (normalizeText(goldFallbackQuery) !== normalizeText(query)) {
+        results = searchChallenges(goldFallbackQuery);
+      }
+    }
+  }
   if (results.length === 0) return [];
-
-  const limitedResults = results.slice(0, MAX_RESULTS_PER_SEARCH);
+  const smartGroups = buildSmartSearchGroups(query, results);
+  const orderedResults = [...smartGroups.primary, ...smartGroups.related];
+  const limitedResults = orderedResults.slice(0, MAX_RESULTS_PER_SEARCH);
   const resolvedResults = [];
-
   for (const item of limitedResults) {
     const imageUrl = await resolveChallengeImage(item);
     resolvedResults.push({ item, imageUrl });
   }
-
-  return buildSearchPayloads(query, results, resolvedResults);
+  const variantMenu =
+    smartGroups.mode === 'weapon' && !isGoldIntent(query) && getVariantIntentsFromQuery(query).length === 0
+      ? buildVariantSelectMenu(query, smartGroups.variants)
+      : null;
+  return buildSearchPayloads(query, smartGroups, resolvedResults, {
+    totalCount: orderedResults.length,
+    variantMenu,
+  });
 }
 
 function searchChallenges(query) {
@@ -546,6 +932,47 @@ async function main(options = {}) {
   });
 
   client.on(Events.InteractionCreate, async (interaction) => {
+    if (interaction.isStringSelectMenu()) {
+      if (!String(interaction.customId || '').startsWith('variant_search:')) return;
+      if (!isAllowedChannel(interaction.channelId)) {
+        await interaction.reply({
+          content: `Use este comando apenas no canal <#${ALLOWED_CHANNEL_ID}>.`,
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const selectedQuery = String(interaction.values?.[0] || '').trim();
+      if (!selectedQuery) {
+        await interaction.reply({
+          content: 'Seleção inválida para variação.',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      try {
+        await interaction.deferReply();
+        const payloads = await buildSearchResponses(selectedQuery);
+        if (payloads.length === 0) {
+          await interaction.editReply(`Nenhum resultado encontrado para "${selectedQuery}".`);
+          return;
+        }
+        await sendPayloads(interaction, payloads, 'interaction');
+      } catch (error) {
+        console.error('[discord] Erro ao processar menu de variações:', error);
+        if (interaction.deferred || interaction.replied) {
+          await interaction.editReply('Ocorreu um erro ao processar a variação selecionada.');
+        } else {
+          await interaction.reply({
+            content: 'Ocorreu um erro ao processar a variação selecionada.',
+            ephemeral: true,
+          });
+        }
+      }
+      return;
+    }
+
     if (!interaction.isChatInputCommand()) return;
     if (interaction.commandName !== SEARCH_COMMAND_NAME) return;
     if (!isAllowedChannel(interaction.channelId)) {
@@ -627,6 +1054,8 @@ if (require.main === module) {
   });
 } else {
   module.exports = {
+    buildSmartSearchGroups,
+    buildVariantSelectMenu,
     buildSearchResponses,
     getChallengeImageCandidates,
     readLocalData,
@@ -639,3 +1068,4 @@ if (require.main === module) {
     },
   };
 }
+
