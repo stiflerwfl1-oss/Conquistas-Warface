@@ -1105,6 +1105,41 @@ function buildGroupedTypePayloads(query, results, options = {}) {
     else if (type === 'insignia') grouped.insignia.push(item);
   }
 
+  const orderedItems = [
+    ...grouped.marca,
+    ...grouped.fita,
+    ...grouped.insignia,
+  ];
+  const summaryLine = `Marcas: ${grouped.marca.length} | Fitas: ${grouped.fita.length} | Insignias: ${grouped.insignia.length}`;
+
+  if (orderedItems.length <= MAX_EMBEDS_PER_MESSAGE) {
+    const payload = {
+      content: [
+        `[BUSCA] Resultados para "${query}": ${results.length} desafio(s).`,
+        summaryLine,
+        ...contentLines,
+      ].filter(Boolean).join('\n'),
+      embeds: orderedItems.map((item) => {
+        const imageUrl = getDisplayImageUrl(item);
+        const embed = {
+          title: `${getTypeLabel(item.type)}: ${item.name}`,
+          description: item.description || 'Sem descricao.',
+          color: getEmbedColor(item.type),
+        };
+        if (imageUrl) {
+          embed.image = { url: imageUrl };
+        }
+        return embed;
+      }),
+    };
+
+    if (components) {
+      payload.components = components;
+    }
+
+    return [payload];
+  }
+
   const makeEmbed = (type, title, items) => {
     const lines = items.length === 0
       ? ['Nenhum desafio neste grupo.']
