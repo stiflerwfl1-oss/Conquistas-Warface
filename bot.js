@@ -16,16 +16,11 @@ const SEARCH_COMMAND_NAME = 'conquista';
 const PORT = Number(process.env.PORT || 3000);
 const MAX_EMBEDS_PER_MESSAGE = 10;
 const MAX_RESULTS_PER_SEARCH = 30;
+const ALLOWED_CHANNEL_ID = '1494869181772861553';
 
 loadEnvFile();
 
 const REFRESH_MINUTES = Number(process.env.DATA_REFRESH_MINUTES || 10);
-const NO_RESULT_LIMIT = 3;
-const NO_RESULT_TIMEOUT_MS = 5 * 60 * 1000;
-const DISCORD_ALLOWED_CHANNEL_IDS = String(process.env.DISCORD_ALLOWED_CHANNEL_IDS || '')
-  .split(',')
-  .map((id) => id.trim())
-  .filter(Boolean);
 const GITHUB_DATA_URL = resolveGithubDataUrl();
 
 let achievementsData = [];
@@ -33,7 +28,6 @@ let catalogData = [];
 let lastDataSource = 'none';
 const warbannerMetadata = loadMetadataMap();
 const imageReachabilityCache = new Map();
-const noResultStreakByUser = new Map();
 
 function loadEnvFile() {
   if (!fs.existsSync(ENV_FILE)) return;
@@ -155,8 +149,7 @@ function normalizeSearchQuery(value) {
 }
 
 function isAllowedChannel(channelId) {
-  if (DISCORD_ALLOWED_CHANNEL_IDS.length === 0) return true;
-  return DISCORD_ALLOWED_CHANNEL_IDS.includes(channelId);
+  return String(channelId || '') === ALLOWED_CHANNEL_ID;
 }
 
 function parseAchievementsFromSource(sourceCode, sourceName) {
@@ -441,35 +434,6 @@ async function resolveChallengeImage(item) {
   return null;
 }
 
-async function handleNoResultAndMaybeTimeout(message) {
-  const previous = noResultStreakByUser.get(message.author.id) || 0;
-  const next = previous + 1;
-  noResultStreakByUser.set(message.author.id, next);
-
-  if (next < NO_RESULT_LIMIT) return;
-
-  noResultStreakByUser.set(message.author.id, 0);
-  try {
-    if (message.member && message.member.moderatable) {
-      await message.member.timeout(
-        NO_RESULT_TIMEOUT_MS,
-        '3 buscas consecutivas sem resultado no bot de desafios.'
-      );
-      await message.channel.send(
-        `${message.author}, voce recebeu timeout de 5 minutos por 3 buscas sem resultado seguidas.`
-      );
-    }
-  } catch (error) {
-    console.error('[discord] Falha ao aplicar timeout por buscas sem resultado:', error);
-  }
-}
-
-function resetNoResultStreak(userId) {
-  if (noResultStreakByUser.has(userId)) {
-    noResultStreakByUser.delete(userId);
-  }
-}
-
 async function buildSearchResponses(query) {
   const results = searchChallenges(query);
   if (results.length === 0) return [];
@@ -584,6 +548,13 @@ async function main(options = {}) {
   client.on(Events.InteractionCreate, async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
     if (interaction.commandName !== SEARCH_COMMAND_NAME) return;
+    if (!isAllowedChannel(interaction.channelId)) {
+      await interaction.reply({
+        content: `Use este comando apenas no canal <#${ALLOWED_CHANNEL_ID}>.`,
+        ephemeral: true,
+      });
+      return;
+    }
 
     const query = interaction.options.getString('termo', true).trim();
     if (!query) {
@@ -628,11 +599,7 @@ async function main(options = {}) {
 
     try {
       const payloads = await buildSearchResponses(content);
-      if (payloads.length === 0) {
-        await handleNoResultAndMaybeTimeout(message);
-        return;
-      }
-      resetNoResultStreak(message.author.id);
+      if (payloads.length === 0) return;
       await sendPayloads(message.channel, payloads, 'channel');
     } catch (error) {
       if (error.code === 50013) {
